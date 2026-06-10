@@ -358,10 +358,13 @@ Polls `CGDisplayStreamCreate` or observes `SCShareableContentInfo` (macOS 15+) t
 
 ```
 NSPasteboard changeCount changes
-  ↓ ClipboardMonitor (background thread, ~200ms poll)
-  ↓ [exclusion check]
-  ↓ read plain string + rich data
-  ↓ [ClickFix heuristic if enabled]
+  ↓ ClipboardMonitor (~200ms poll; reads only on change)
+  ↓ [self-write marker / transient → skip]
+  ↓ kind detection: file URLs → .fileList   (checked first — Finder also
+  ↓                 string    → .text        puts the file *name* as text)
+  ↓                 image     → .image       (PNG-normalized, ≤10 MB, thumbnail)
+  ↓ [exclusion check + per-kind capture toggles]
+  ↓ [ClickFix / pattern scan — .text only]
   ↓ HistoryStore.insert()
       ↓ SHA-256 hash → dedup check
       ↓ AES-256-GCM encrypt (plain + rich separately)

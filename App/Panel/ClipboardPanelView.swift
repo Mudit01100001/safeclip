@@ -5,6 +5,9 @@ import SwiftUI
 /// search field → list → ClickFix warning (when relevant) → hint bar.
 struct ClipboardPanelView: View {
     @Bindable var model: PanelViewModel
+    /// True when an NSGlassEffectView provides the chrome (macOS 26+) —
+    /// the view then draws no background of its own.
+    var glassChrome = false
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -20,7 +23,12 @@ struct ClipboardPanelView: View {
         }
         .frame(width: FloatingPanelController.panelSize.width,
                height: FloatingPanelController.panelSize.height)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background {
+            if !glassChrome {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.regularMaterial)
+            }
+        }
         .onChange(of: model.focusEpoch, initial: true) {
             searchFocused = true
         }
@@ -124,6 +132,13 @@ struct ClipRowView: View {
         HStack(spacing: 8) {
             leadingBadge
                 .frame(width: 14)
+            if let thumbnail {
+                Image(nsImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 28, height: 28)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
             Text(displayText)
                 .font(.system(.body, design: masked ? .monospaced : .default))
                 .lineLimit(1)
@@ -144,12 +159,26 @@ struct ClipRowView: View {
         .help(helpText)
     }
 
+    private var thumbnail: NSImage? {
+        guard item.kind == .image, !masked, let data = item.thumbnailData else { return nil }
+        return NSImage(data: data)
+    }
+
     private var displayText: String {
         if masked { return "••••••••••••" }
-        let firstLine = item.plainText
-            .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-            .first.map(String.init) ?? item.plainText
-        return firstLine.trimmingCharacters(in: .whitespaces)
+        switch item.kind {
+        case .image:
+            return item.plainText // "Image W×H" placeholder
+        case .fileList:
+            let paths = item.plainText.split(separator: "\n")
+            let first = paths.first.map { URL(fileURLWithPath: String($0)).lastPathComponent } ?? "Files"
+            return paths.count > 1 ? "\(first) +\(paths.count - 1) more" : first
+        case .text:
+            let firstLine = item.plainText
+                .split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
+                .first.map(String.init) ?? item.plainText
+            return firstLine.trimmingCharacters(in: .whitespaces)
+        }
     }
 
     @ViewBuilder
@@ -170,14 +199,27 @@ struct ClipRowView: View {
             }
         } else if item.isBurn {
             Image(systemName: "flame.fill").font(.caption).foregroundStyle(.red)
+        } else if item.kind == .image {
+            Image(systemName: "photo").font(.caption).foregroundStyle(.secondary)
+        } else if item.kind == .fileList {
+            Image(systemName: "doc.on.doc").font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var trailingDetail: String {
         var parts: [String] = []
         if item.isBurn { parts.append("burns") }
-        if item.charCount > 80 {
-            parts.append("\(item.charCount.formatted()) chars")
+        switch item.kind {
+        case .image:
+            parts.append(ByteCountFormatter.string(
+                fromByteCount: Int64(item.charCount), countStyle: .file
+            ))
+        case .fileList:
+            parts.append(item.charCount == 1 ? "1 file" : "\(item.charCount) files")
+        case .text:
+            if item.charCount > 80 {
+                parts.append("\(item.charCount.formatted()) chars")
+            }
         }
         parts.append(Self.relativeTime(item.lastUsedAt ?? item.createdAt))
         return parts.joined(separator: " · ")

@@ -40,6 +40,7 @@ A **privacy-first macOS clipboard manager**. The differentiators — none of whi
 - ~~M3 polish~~ ✅ onboarding w/ terms consent, settings (4 tabs), login item, expiry, clear-all — **notarization pending Developer ID cert** (`Scripts/release.sh` ready)
 - ~~M4 privacy~~ ✅ burn-after-paste, screen-record heuristic + manual Privacy Mode, exclusion list
 - ~~M5 detection~~ ✅ ClickFix warnings, opt-in pattern detection, concealed-password masking, pinning
+- ~~v0.2.0 (Session 3)~~ ✅ **images + file copies in history** (encrypted payloads + thumbnails, schema v2 migration, 40 tests) and **Liquid Glass** panel chrome on macOS 26+ (material fallback ≤25). See ROADMAP R13.
 
 Full milestone detail + deltas from plan: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -104,7 +105,7 @@ security find-generic-password -s SafeClip                    # key present ✅
 - **Migrations vs. code is not a thing here** (no DB server) — but **notarization is**: a code change isn't shippable until the binary is re-signed + notarized. Source push ≠ released build.
 - **macOS 16 will change clipboard capture** — abstract capture behind a protocol with two impls (`changeCount` polling for ≤15, `detect`-before-read for 16+). Test on the 15.4 preview now. (PRD §15.)
 - **Never claim zero-knowledge against the OS.** The encryption protects the on-disk store, not the live system clipboard (which Universal Clipboard syncs across devices).
-- **Keep scope minimal.** No images/files in history v1, no AI, no sync v1, no browser extension. (PRD §13.)
+- **Keep scope minimal.** No AI, no sync v1, no browser extension. (PRD §13.) Images/files were added in v0.2.0 by owner decision — encrypted like text, paths-not-contents for files.
 
 ---
 

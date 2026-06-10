@@ -320,6 +320,8 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 | Strip formatting by default | On | Off = default paste keeps formatting |
 | Screen-recording privacy | On | Blur panel while recording |
 | Source-app exclusion list | Empty | User adds bundle IDs |
+| Capture images | On (v0.2.0) | Encrypted PNG ≤10 MB + encrypted thumbnail |
+| Capture file copies | On (v0.2.0) | Stores paths, not contents |
 | Pattern detection | Off | Opt-in; sub-toggles per pattern type |
 | Auto-burn flagged items | Off | Only meaningful if pattern detection on |
 | Launch at login | On | `SMAppService` |
@@ -357,7 +359,7 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 | Keychain key missing/corrupt on launch | Offer to regenerate (wipes unreadable history) with a clear warning; never silently lose data without consent. |
 | Multi-monitor / notch | Clamp panel origin to visible `NSScreen.visibleFrame`. |
 | Huge clipboard item (e.g. 50MB image as text) | Cap stored plain text at a sane limit (e.g. 1MB); store a truncation marker; never store images in v1. |
-| Non-text clipboard (files, images) | v1 captures plain-text representation only; ignore pure-image/file copies (document this). |
+| Non-text clipboard (files, images) | ~~v1: text only~~ v0.2.0: images stored encrypted (≤10 MB, larger skipped); file copies store paths. Mixed string+image pasteboards prefer the string (spreadsheet-cell case); known trade-off documented in DESIGN. |
 | Rapid successive copies | Debounce on `changeCount`; dedup by hash. |
 | App copies then immediately clears (password managers) | We may capture before the manager clears. Mitigated by exclusion list (opt-in) and burn-after-paste. Disclosed in TERMS. |
 | Pasteboard write race during paste | Accept best-effort window; document in TERMS §3. |
@@ -370,7 +372,7 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 
 - **No cloud backend in v1.** Local-only. No telemetry. No crash reporting that includes clipboard content.
 - **No rich-text preview in the panel.** Formatted items stored, but the panel renders plain text only.
-- **No images / files in history (v1).** Text only. Revisit later.
+- ~~**No images / files in history (v1).** Text only. Revisit later.~~ **Revised in v0.2.0 by owner decision (June 2026):** images (encrypted, PNG-normalized, ≤10 MB, with encrypted thumbnails) and file copies (paths stored, files re-referenced on paste) are captured; both toggleable in Settings → General. See ROADMAP R13.
 - **No Windows / Linux.** macOS-only; Keychain + AppKit throughout.
 - **No browser extension.** OS-level monitoring is sufficient.
 - **No AI features.** No summarisation, grouping, or "smart" anything. Scope stays minimal.

@@ -139,12 +139,26 @@ struct OnboardingView: View {
             if page < 2 {
                 Button("Continue") { page += 1 }
                     .keyboardShortcut(.defaultAction)
+                    .prominentGlassWhenAvailable()
                     .disabled(page == 0 && !termsUnderstood)
             } else {
                 Button("Start Using SafeClip") { onFinish(termsUnderstood) }
                     .keyboardShortcut(.defaultAction)
+                    .prominentGlassWhenAvailable()
             }
         }
         .padding(16)
+    }
+}
+
+extension View {
+    /// Liquid Glass prominent buttons on macOS 26+, bordered-prominent below.
+    @ViewBuilder
+    func prominentGlassWhenAvailable() -> some View {
+        if #available(macOS 26.0, *) {
+            buttonStyle(.glassProminent)
+        } else {
+            buttonStyle(.borderedProminent)
+        }
     }
 }

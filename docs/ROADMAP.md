@@ -38,7 +38,7 @@ _Last updated: June 2026. Distribution decided: non-sandboxed, notarized .dmg of
 | Notarized release | ⏳ blocked on Developer ID cert (`Scripts/release.sh` ready) |
 | Interactive UI QA | ⏳ needs a human at the keyboard |
 
-**Milestone status:** M0 ✅ · M1 ✅ · M2 ✅ (code; interactive QA pending) · M3 ✅ except notarization · M4 ✅ (screen-record detection is heuristic — see R12) · M5 ✅
+**Milestone status:** M0 ✅ · M1 ✅ · M2 ✅ (code; interactive QA pending) · M3 ✅ except notarization · M4 ✅ (screen-record detection is heuristic — see R12) · M5 ✅ · **v0.2.0 ✅** images + file copies + Liquid Glass (R13), 40 tests, live-verified
 
 **Next actions:** interactive QA of the panel and onboarding; Developer ID + first notarized release; product calls (name trademark check, pricing).
 
@@ -400,7 +400,7 @@ These are explicitly **not in scope** for v1 but are worth tracking so future-Mu
 | Feature | Notes | Why deferred |
 |---------|-------|--------------|
 | **iCloud sync (zero-knowledge)** | Client-side encrypt before upload; server stores only ciphertext. Requires CloudKit entitlement + significant complexity. | Adds attack surface, complexity, and trust concerns. No demand signal yet. |
-| **Images / files in history** | Store image previews + raw data. UI needs thumbnail grid. | Text-only in v1 keeps scope tiny. |
+| ~~**Images / files in history**~~ | ~~Store image previews + raw data.~~ | **Shipped in v0.2.0** (see R13). |
 | **Browser extension** | Could mark clipboard writes from web forms as "from browser" more reliably than frontmost-app heuristic. | OS-level monitoring sufficient for v1. Extension adds distribution complexity. |
 | **AI features** | Summarise items, group by topic, smart search. | Explicitly anti-scope. SafeClip's identity is "does one thing, no bloat." |
 | **Windows / Linux** | NSPasteboard, NSPanel, Keychain are macOS-only throughout. | Would require a rewrite from scratch. |
@@ -454,6 +454,14 @@ Decisions and their research backing, so future sessions don't re-derive them.
 
 ### R12 — Screen-record detection is heuristic-only without permissions (limitation accepted)
 **Reality:** every robust "is the screen being recorded/shared" API requires holding the Screen Recording permission ourselves — violating the zero-permission pledge. Shipped: detection of the macOS capture UI (`screencaptureui`) + a one-click **manual Privacy Mode** in the menu bar for conferencing scenarios. F8's "Zoom blurs within 1s" acceptance is **not fully met** and is documented in Settings copy and README. Revisit if users prefer granting the permission for full coverage.
+
+### R13 — v0.2.0: images, file copies, Liquid Glass (owner-revised scope, June 10 2026)
+**What changed:** PRD §13's "no images/files in v1" non-goal was revised by owner decision. Schema v2 adds `kind` (`text`/`image`/`file_list`) + encrypted thumbnail columns; migration tested against a frozen v1 database.
+**Images:** stored encrypted, PNG-normalized (deterministic dedup; dedup hashes the *payload bytes*, since the "Image W×H" placeholder would collide distinct images), 10 MB cap, 96px encrypted thumbnail for the row preview. Pasting writes an `NSImage` (PNG+TIFF reps for receiver compatibility); the plain/rich modifier is ignored for images.
+**Files:** paths stored (newline-joined, encrypted), not contents; pasting writes real file URLs plus the path text for plain-text fields. File-URL detection runs *before* the string check because Finder also puts the file name on the pasteboard as text.
+**Known trade-off:** mixed string+image pasteboards prefer the string (right for spreadsheet cells; a browser "Copy Image" that includes a URL string captures the URL instead of the image).
+**Metadata in clear (by design):** `kind` and `rich_type` (`public.png`) are cleartext like `char_count` — they reveal *that* a row is an image, never content. Verified live: no PNG magic bytes anywhere in the database file.
+**Liquid Glass:** the panel chrome is `NSGlassEffectView` (cornerRadius 18) on macOS 26+, `.regularMaterial` below; onboarding primary buttons use `.glassProminent` with `.borderedProminent` fallback. Settings/menus get the system treatment automatically from the SDK 26 build.
 
 ### R8 — Screen recording detection method
 **Decision:** Use `SCShareableContentInfo` on macOS 15+ (preferred); fall back to `CGDisplayStream` heuristic on macOS 14.  

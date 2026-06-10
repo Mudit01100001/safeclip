@@ -20,14 +20,49 @@ final class PasteService {
         let pasteboard = NSPasteboard.general
         let sensitive = item.isConcealed || item.isBurn
 
-        var types: [NSPasteboard.PasteboardType] = [
-            .string,
-            .init(PasteboardConvention.safeClipMarker),
-            .init(PasteboardConvention.source),
-        ]
-        if sensitive {
-            types.append(.init(PasteboardConvention.concealed))
+        switch item.kind {
+        case .image:
+            placeImage(item, on: pasteboard, sensitive: sensitive)
+        case .fileList:
+            placeFiles(item, on: pasteboard, sensitive: sensitive)
+        case .text:
+            placeText(item, on: pasteboard, asRich: asRich, sensitive: sensitive)
         }
+
+        scheduleClearIfSensitive(
+            pasteboard, sensitive: sensitive, clearAfterSeconds: clearAfterSeconds
+        )
+    }
+
+    /// Images paste as images regardless of the plain/rich modifier; the
+    /// "Image W×H" placeholder is display-only and never written out.
+    private func placeImage(_ item: ClipItem, on pasteboard: NSPasteboard, sensitive: Bool) {
+        pasteboard.clearContents()
+        if let data = item.richData, let image = NSImage(data: data) {
+            // NSImage provides multiple representations (PNG + TIFF) so
+            // older receivers that only read TIFF still work.
+            pasteboard.writeObjects([image])
+        }
+        markOwnWrite(pasteboard, sensitive: sensitive)
+    }
+
+    /// File lists paste as real file URLs (Finder pastes the files) plus the
+    /// path text for plain-text fields.
+    private func placeFiles(_ item: ClipItem, on pasteboard: NSPasteboard, sensitive: Bool) {
+        pasteboard.clearContents()
+        let urls = item.plainText
+            .split(separator: "\n")
+            .map { URL(fileURLWithPath: String($0)) as NSURL }
+        if !urls.isEmpty {
+            pasteboard.writeObjects(urls)
+        }
+        pasteboard.addTypes([.string], owner: nil)
+        pasteboard.setString(item.plainText, forType: .string)
+        markOwnWrite(pasteboard, sensitive: sensitive)
+    }
+
+    private func placeText(_ item: ClipItem, on pasteboard: NSPasteboard, asRich: Bool, sensitive: Bool) {
+        var types: [NSPasteboard.PasteboardType] = [.string]
         let richType: NSPasteboard.PasteboardType? =
             (asRich && item.richData != nil && item.richType != nil)
                 ? .init(item.richType!) : nil
@@ -37,6 +72,24 @@ final class PasteService {
 
         pasteboard.declareTypes(types, owner: nil)
         pasteboard.setString(item.plainText, forType: .string)
+        if let richType, let richData = item.richData {
+            pasteboard.setData(richData, forType: richType)
+        }
+        markOwnWrite(pasteboard, sensitive: sensitive)
+    }
+
+    /// Every SafeClip write carries the self-write marker (so the monitor
+    /// never re-captures it) and the source convention; sensitive writes are
+    /// re-marked concealed so other clipboard managers skip them.
+    private func markOwnWrite(_ pasteboard: NSPasteboard, sensitive: Bool) {
+        var types: [NSPasteboard.PasteboardType] = [
+            .init(PasteboardConvention.safeClipMarker),
+            .init(PasteboardConvention.source),
+        ]
+        if sensitive {
+            types.append(.init(PasteboardConvention.concealed))
+        }
+        pasteboard.addTypes(types, owner: nil)
         pasteboard.setString("1", forType: .init(PasteboardConvention.safeClipMarker))
         pasteboard.setString(
             Bundle.main.bundleIdentifier ?? "com.mudit.safeclip",
@@ -45,10 +98,11 @@ final class PasteService {
         if sensitive {
             pasteboard.setString("1", forType: .init(PasteboardConvention.concealed))
         }
-        if let richType, let richData = item.richData {
-            pasteboard.setData(richData, forType: richType)
-        }
+    }
 
+    private func scheduleClearIfSensitive(
+        _ pasteboard: NSPasteboard, sensitive: Bool, clearAfterSeconds: Int
+    ) {
         guard sensitive, clearAfterSeconds > 0 else { return }
         let expectedChangeCount = pasteboard.changeCount
         Task { @MainActor in

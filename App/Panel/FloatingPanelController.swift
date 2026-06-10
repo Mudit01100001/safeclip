@@ -49,9 +49,25 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
             panel.standardWindowButton(button)?.isHidden = true
         }
 
-        let host = NSHostingView(rootView: ClipboardPanelView(model: model))
-        host.frame = NSRect(origin: .zero, size: Self.panelSize)
-        panel.contentView = host
+        // Liquid Glass chrome on macOS 26+ (NSGlassEffectView refracts the
+        // content behind the panel, Spotlight-style); material fallback below.
+        // The SwiftUI view skips its own background when glass wraps it.
+        if #available(macOS 26.0, *) {
+            let host = NSHostingView(
+                rootView: ClipboardPanelView(model: model, glassChrome: true)
+            )
+            host.frame = NSRect(origin: .zero, size: Self.panelSize)
+            let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: Self.panelSize))
+            glass.cornerRadius = 18
+            glass.contentView = host
+            panel.contentView = glass
+        } else {
+            let host = NSHostingView(
+                rootView: ClipboardPanelView(model: model, glassChrome: false)
+            )
+            host.frame = NSRect(origin: .zero, size: Self.panelSize)
+            panel.contentView = host
+        }
 
         model.onRequestPaste = { [weak self] item, optionHeld in
             self?.performPaste(item: item, optionHeld: optionHeld)

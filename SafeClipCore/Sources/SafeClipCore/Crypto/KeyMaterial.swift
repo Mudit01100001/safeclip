@@ -36,7 +36,13 @@ public struct KeyMaterial: @unchecked Sendable {
 
     /// Keyed, one-way content identifier used for deduplication.
     public func contentHash(_ text: String) -> String {
-        let mac = HMAC<SHA256>.authenticationCode(for: Data(text.utf8), using: hmacKey)
+        contentHash(Data(text.utf8))
+    }
+
+    /// Byte-level variant — used for image payloads, where the display
+    /// placeholder ("Image 1280×800") would wrongly collide distinct images.
+    public func contentHash(_ data: Data) -> String {
+        let mac = HMAC<SHA256>.authenticationCode(for: data, using: hmacKey)
         return Data(mac).map { String(format: "%02x", $0) }.joined()
     }
 }

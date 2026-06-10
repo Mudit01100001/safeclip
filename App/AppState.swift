@@ -19,8 +19,38 @@ struct AppSettings: Codable, Equatable, Sendable {
     var captureConcealed: Bool = true             // Mudit copies passwords and wants them captured
     var maskConcealedPreviews: Bool = true        // …but masked in the panel
     var autoBurnConcealed: Bool = false
+    var captureImages: Bool = true                // v0.2.0 — encrypted, PNG-normalized, ≤10 MB
+    var captureFiles: Bool = true                 // v0.2.0 — stores paths, not file contents
     var clearClipboardAfterSensitivePaste: Int = 35  // seconds; 0 = off
     var launchAtLogin: Bool = true
+}
+
+// Tolerant decoding: fields added in later versions fall back to their
+// defaults instead of failing the decode and silently resetting *all*
+// settings (which is what synthesized Codable would do).
+extension AppSettings {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppSettings()
+        historyLimit = try c.decodeIfPresent(Int.self, forKey: .historyLimit) ?? d.historyLimit
+        expiryDays = try c.decodeIfPresent(Int.self, forKey: .expiryDays) ?? d.expiryDays
+        stripFormattingByDefault = try c.decodeIfPresent(Bool.self, forKey: .stripFormattingByDefault) ?? d.stripFormattingByDefault
+        screenRecordingPrivacy = try c.decodeIfPresent(Bool.self, forKey: .screenRecordingPrivacy) ?? d.screenRecordingPrivacy
+        exclusionList = try c.decodeIfPresent([String].self, forKey: .exclusionList) ?? d.exclusionList
+        patternDetectionEnabled = try c.decodeIfPresent(Bool.self, forKey: .patternDetectionEnabled) ?? d.patternDetectionEnabled
+        detectAPIKeys = try c.decodeIfPresent(Bool.self, forKey: .detectAPIKeys) ?? d.detectAPIKeys
+        detectCards = try c.decodeIfPresent(Bool.self, forKey: .detectCards) ?? d.detectCards
+        detectPrivateKeys = try c.decodeIfPresent(Bool.self, forKey: .detectPrivateKeys) ?? d.detectPrivateKeys
+        autoBurnFlagged = try c.decodeIfPresent(Bool.self, forKey: .autoBurnFlagged) ?? d.autoBurnFlagged
+        clickFixDetection = try c.decodeIfPresent(Bool.self, forKey: .clickFixDetection) ?? d.clickFixDetection
+        captureConcealed = try c.decodeIfPresent(Bool.self, forKey: .captureConcealed) ?? d.captureConcealed
+        maskConcealedPreviews = try c.decodeIfPresent(Bool.self, forKey: .maskConcealedPreviews) ?? d.maskConcealedPreviews
+        autoBurnConcealed = try c.decodeIfPresent(Bool.self, forKey: .autoBurnConcealed) ?? d.autoBurnConcealed
+        captureImages = try c.decodeIfPresent(Bool.self, forKey: .captureImages) ?? d.captureImages
+        captureFiles = try c.decodeIfPresent(Bool.self, forKey: .captureFiles) ?? d.captureFiles
+        clearClipboardAfterSensitivePaste = try c.decodeIfPresent(Int.self, forKey: .clearClipboardAfterSensitivePaste) ?? d.clearClipboardAfterSensitivePaste
+        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? d.launchAtLogin
+    }
 }
 
 enum SettingsStore {
@@ -43,9 +73,13 @@ enum SettingsStore {
 
 /// One observed pasteboard change, as read by the clipboard monitor.
 struct PasteboardCapture: Sendable {
+    var kind: ClipKind = .text
     var plainText: String
     var richData: Data?
     var richType: String?
+    var thumbnailData: Data?
+    /// Image byte count / file count; nil for text (uses character count).
+    var countOverride: Int?
     var sourceBundle: String?
     /// The source app marked this content `org.nspasteboard.ConcealedType`.
     var isConcealed: Bool
@@ -119,6 +153,12 @@ final class AppState {
             return // F10: excluded apps leave no row at all
         }
 
+        switch capture.kind {
+        case .image where !settings.captureImages: return
+        case .fileList where !settings.captureFiles: return
+        default: break
+        }
+
         var flagReason: FlagReason?
         var burn = false
 
@@ -128,7 +168,9 @@ final class AppState {
             guard settings.captureConcealed else { return }
             flagReason = .concealed
             burn = settings.autoBurnConcealed
-        } else {
+        } else if capture.kind == .text {
+            // Pattern/ClickFix scanning is text-only — image bytes and file
+            // paths aren't shell commands or credentials.
             let options = SecurityScanner.Options(
                 detectClickFix: settings.clickFixDetection,
                 detectAPIKeys: settings.patternDetectionEnabled && settings.detectAPIKeys,
@@ -149,12 +191,15 @@ final class AppState {
         }
 
         let input = CaptureInput(
+            kind: capture.kind,
             plainText: capture.plainText,
             richData: capture.richData,
             richType: capture.richType,
+            thumbnailData: capture.thumbnailData,
             sourceBundle: capture.sourceBundle,
             flagReason: flagReason,
-            isBurn: burn
+            isBurn: burn,
+            countOverride: capture.countOverride
         )
         do {
             _ = try store.insert(input)

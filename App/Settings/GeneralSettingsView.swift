@@ -14,6 +14,17 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section {
+                Toggle("Capture images", isOn: appState.settingsBinding(\.captureImages))
+                Toggle("Capture file copies", isOn: appState.settingsBinding(\.captureFiles))
+            } header: {
+                Text("What gets captured")
+            } footer: {
+                Text("Images are stored encrypted (PNG, up to 10 MB — larger copies are skipped). File copies store the file locations, not the file contents; pasting re-references the original files.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("History") {
                 Picker("Keep at most", selection: appState.settingsBinding(\.historyLimit)) {
                     Text("50 items").tag(50)

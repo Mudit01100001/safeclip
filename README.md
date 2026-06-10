@@ -37,6 +37,11 @@ Every mainstream macOS clipboard manager stores your history as plaintext on dis
 - The encryption protects SafeClip's *store*, not the live system clipboard (which Universal Clipboard syncs to your other Apple devices).
 - "Burn after paste" is best-effort cleanup, not a cryptographic guarantee.
 
+**Images and files too (v0.2.0)**
+- Copied images land in history encrypted (PNG-normalized, up to 10 MB) with an encrypted thumbnail for the panel preview — a screenshot in your history is as unreadable on disk as a password.
+- Finder file copies store the file *locations* (not contents); pasting re-references the original files. Both capture kinds can be switched off in Settings.
+- On macOS Tahoe the panel wears the system's Liquid Glass material; older macOS gets the classic translucent material.
+
 **Opt-in extras** (off by default — you decide)
 - Pattern detection: flags API keys (`ghp_`, `sk-`, `AKIA`…), Luhn-valid card numbers, private key blocks.
 - ClickFix detection: warns when a *website* overwrote your clipboard with something that looks like a shell command — the #1 macOS malware-delivery trick of 2025. Warns, never blocks.

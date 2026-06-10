@@ -65,22 +65,39 @@ public final class HistoryStore: Sendable {
             }
             try db.create(index: "idx_clips_created", on: "clips", columns: ["created_at"])
         }
+        // v0.2.0: images and file lists in history (owner-revised scope).
+        // Existing rows default to kind 'text'.
+        migrator.registerMigration("v2-kinds-and-thumbnails") { db in
+            try db.alter(table: "clips") { t in
+                t.add(column: "kind", .text).notNull().defaults(to: ClipKind.text.rawValue)
+                t.add(column: "thumb_cipher", .blob)
+                t.add(column: "thumb_nonce", .blob)
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 
     // MARK: - Writes
 
     public func insert(_ capture: CaptureInput, now: Date = Date()) throws -> InsertOutcome {
-        let originalCount = capture.plainText.count
-        guard !capture.plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let originalCount = capture.countOverride ?? capture.plainText.count
+        if capture.kind == .text,
+           capture.plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .skippedEmpty
         }
         var text = capture.plainText
-        if originalCount > Self.maxStoredCharacters {
+        if capture.kind == .text, text.count > Self.maxStoredCharacters {
             text = String(text.prefix(Self.maxStoredCharacters)) + "⋯"
         }
 
-        let hash = keys.contentHash(text)
+        // Dedup identity: the payload bytes for images (the placeholder text
+        // would collide distinct images), the text itself otherwise.
+        let hash: String =
+            if capture.kind == .image, let payload = capture.richData {
+                keys.contentHash(payload)
+            } else {
+                keys.contentHash(text)
+            }
         let epoch = Int64(now.timeIntervalSince1970)
         let encryptor = self.encryptor
 
@@ -117,17 +134,26 @@ public final class HistoryStore: Sendable {
                 richCipher = sealed.ciphertext
                 richNonce = sealed.nonce
             }
+            var thumbCipher: Data?
+            var thumbNonce: Data?
+            if let thumb = capture.thumbnailData {
+                let sealed = try encryptor.encrypt(thumb)
+                thumbCipher = sealed.ciphertext
+                thumbNonce = sealed.nonce
+            }
             try db.execute(
                 sql: """
                     INSERT INTO clips
-                      (id, ciphertext, nonce, rich_cipher, rich_nonce, rich_type,
+                      (id, kind, ciphertext, nonce, rich_cipher, rich_nonce, rich_type,
+                       thumb_cipher, thumb_nonce,
                        content_hash, char_count, source_bundle,
                        is_pinned, is_burn, is_flagged, flag_reason, created_at, last_used_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, NULL)
                     """,
                 arguments: [
-                    id.uuidString, cipher, nonce, richCipher, richNonce,
+                    id.uuidString, capture.kind.rawValue, cipher, nonce, richCipher, richNonce,
                     capture.richData != nil ? capture.richType : nil,
+                    thumbCipher, thumbNonce,
                     hash, originalCount, capture.sourceBundle,
                     capture.isBurn, capture.flagReason != nil,
                     capture.flagReason?.rawValue, epoch,
@@ -255,16 +281,23 @@ public final class HistoryStore: Sendable {
         if let richCipher: Data = row["rich_cipher"], let richNonce: Data = row["rich_nonce"] {
             rich = try? encryptor.decrypt(ciphertext: richCipher, nonce: richNonce)
         }
+        var thumbnail: Data?
+        if let thumbCipher: Data = row["thumb_cipher"], let thumbNonce: Data = row["thumb_nonce"] {
+            thumbnail = try? encryptor.decrypt(ciphertext: thumbCipher, nonce: thumbNonce)
+        }
 
         let createdEpoch: Int64 = row["created_at"]
         let lastUsedEpoch: Int64? = row["last_used_at"]
         let reason: String? = row["flag_reason"]
+        let kindRaw: String? = row["kind"]
 
         return ClipItem(
             id: id,
+            kind: kindRaw.flatMap(ClipKind.init(rawValue:)) ?? .text,
             plainText: plain,
             richData: rich,
             richType: row["rich_type"],
+            thumbnailData: thumbnail,
             charCount: row["char_count"],
             sourceBundle: row["source_bundle"],
             isPinned: row["is_pinned"],

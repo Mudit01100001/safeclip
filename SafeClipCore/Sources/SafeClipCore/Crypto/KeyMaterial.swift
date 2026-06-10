@@ -13,7 +13,10 @@ import Foundation
 /// database file. Using HMAC with a key derived from the master key keeps
 /// dedup exact-match semantics while making the hash useless without the
 /// Keychain key. This matters precisely because SafeClip captures passwords.
-public struct KeyMaterial: Sendable {
+// @unchecked: SymmetricKey is an immutable value type and thread-safe, but
+// only newer SDKs declare it Sendable — this bridges the SDK gap (CI builds
+// on older Xcode than local).
+public struct KeyMaterial: @unchecked Sendable {
     public let encryptionKey: SymmetricKey
     private let hmacKey: SymmetricKey
 

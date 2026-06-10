@@ -11,7 +11,9 @@ public enum EncryptionError: Error, Equatable {
 /// Storage layout matches the PRD §9 schema: the 12-byte GCM nonce lives in its
 /// own column; the `ciphertext` blob is ciphertext followed by the 16-byte
 /// authentication tag. Tampering with either causes `decrypt` to throw.
-public struct EncryptionService: Sendable {
+// @unchecked: SymmetricKey is immutable and thread-safe; older SDKs don't
+// declare it Sendable (see KeyMaterial).
+public struct EncryptionService: @unchecked Sendable {
     private static let tagLength = 16
     private let key: SymmetricKey
 

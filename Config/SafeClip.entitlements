@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	Deliberately empty (ROADMAP §3.3): no App Sandbox — decided non-sandboxed,
+	distributed as a notarized .dmg outside the Mac App Store. Hardened Runtime
+	is enabled via the ENABLE_HARDENED_RUNTIME build setting; it needs no
+	entitlement keys here because SafeClip loads no plugins, JIT, or
+	unsigned code. Keychain access requires no entitlement for the login
+	keychain. Zero permission prompts at launch is a core design pillar.
+	-->
+</dict>
+</plist>

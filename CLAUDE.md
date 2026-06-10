@@ -1,5 +1,5 @@
 # SafeClip — CLAUDE.md
-_Last updated: 6 June 2026 (Session 2 — design docs + sandbox decision)._
+_Last updated: 10 June 2026 (Session 3 — **full build, M0–M5 implemented**)._
 
 > This file auto-loads at the start of every Claude Code session opened in this folder. It is the single source of truth for "what is this and what's next." Detailed product spec lives in [PRD.md](PRD.md).
 
@@ -7,9 +7,15 @@ _Last updated: 6 June 2026 (Session 2 — design docs + sandbox decision)._
 
 ## 🚦 SESSION HANDOFF — read first
 
-**Status: PRE-BUILD.** Planning and design docs complete; no code exists yet. The next session's job is to scaffold the Xcode project (Milestone M0).
+**Status: BUILT.** All milestone code (M0–M5) is implemented, builds with **zero warnings** under Swift 6 strict concurrency, 34 core tests pass, and the automated security smoke test passes live (encrypted rows on disk, keychain key, dedup, relaunch persistence). Repo: [github.com/Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip).
 
-**Sandbox decision made (Session 2):** Non-sandboxed, Hardened Runtime on, notarized `.dmg` distributed off GitHub Releases. No Mac App Store target.
+**What remains (needs Mudit, not code):**
+1. **Interactive QA** — press ⌃⇧V and exercise the panel by hand (automated tests can't drive the UI): search, arrows, ⌥Return rich paste, context menu, settings tabs, onboarding flow (delete the `com.mudit.safeclip` defaults domain to re-trigger it).
+2. **macOS clipboard prompt** — on some machines the first background capture shows a one-time "paste from other apps" system prompt → choose *Always Allow*. The deny path is handled (capture pauses + menu-bar warning).
+3. **Notarized release** — needs a paid Apple Developer account + "Developer ID Application" cert, then `Scripts/release.sh` does build→sign→notarize→staple→dmg. Until then, local builds sign with the Apple Development cert (team `YHK4D97KC4`).
+4. Open product calls: app name trademark check, paid-vs-free (PRD §19).
+
+**Sandbox decision (Session 2):** Non-sandboxed, Hardened Runtime on, notarized `.dmg` off GitHub Releases. No Mac App Store target.
 
 ### What this project is
 A **privacy-first macOS clipboard manager**. The differentiators — none of which any mainstream competitor (Maccy, Paste, CleanClip, CopyClip, Raycast) currently ships:
@@ -27,28 +33,35 @@ A **privacy-first macOS clipboard manager**. The differentiators — none of whi
 - **The "paste window" is a real, unfixable limitation** — plaintext sits on `NSPasteboard` for <1s during paste. We **disclose** it honestly (TERMS §3); we never claim "delete after use" is cryptographic.
 - **Local-only, open source (MIT).** No backend, no telemetry. HN users won't trust a closed-source clipboard manager.
 
-### ⚡ IMMEDIATE NEXT STEPS (next session = Milestone M0)
-1. `git init` in this folder (not yet a repo). Create the GitHub repo `safeclip` and replace `YOUR_USERNAME` in [TERMS.md](TERMS.md) (×2).
-2. Scaffold an Xcode project: menu-bar (`NSStatusItem`) app shell, Swift 6, min macOS 14.
-3. Wire dependencies via SPM: `GRDB.swift` (SQLite), `KeyboardShortcuts` (global hotkey).
-4. ~~Decide the **sandbox stance**~~ **DECIDED: non-sandboxed, notarized .dmg off GitHub Releases.** No MAS target.
-5. Get a clean build (zero warnings) launching to a menu-bar icon = M0 exit criteria.
+### ⚡ MILESTONE STATE (all code shipped 10 June 2026)
+- ~~M0 scaffold~~ ✅ xcodegen project, SPM deps wired, menu-bar shell, zero-warning build
+- ~~M1 capture + encrypted store~~ ✅ AES-256-GCM + Keychain + GRDB, live-verified with `strings`
+- ~~M2 floating panel~~ ✅ non-activating cursor panel, search, plain/⌥rich paste, full keyboard nav
+- ~~M3 polish~~ ✅ onboarding w/ terms consent, settings (4 tabs), login item, expiry, clear-all — **notarization pending Developer ID cert** (`Scripts/release.sh` ready)
+- ~~M4 privacy~~ ✅ burn-after-paste, screen-record heuristic + manual Privacy Mode, exclusion list
+- ~~M5 detection~~ ✅ ClickFix warnings, opt-in pattern detection, concealed-password masking, pinning
 
-Then M1 (capture + encrypted store), M2 (floating panel), M3 (v1.0 polish + notarize). Full milestone table: PRD §14.
+Full milestone detail + deltas from plan: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
 ## Files in this folder
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
 | [PRD.md](PRD.md) | Full product spec — features (P0/P1/P2 w/ acceptance criteria), UX, security architecture, data model, milestones, risks, testing, research appendix with sources. |
-| [TERMS.md](TERMS.md) | Terms of Use / liability disclaimer. Shown at first launch + in README. Discloses the paste-window limit. ⚠️ Has `YOUR_USERNAME` placeholder ×2. |
+| [TERMS.md](TERMS.md) | Terms of Use / liability disclaimer. Linked from onboarding + README. Discloses the paste-window limit. |
+| [README.md](README.md) | Public pitch: gap table, security model (honest version), install + build-from-source. |
+| [SECURITY.md](SECURITY.md) | Private-advisory process; in/out of scope. |
 | [LICENSE](LICENSE) | MIT. |
 | CLAUDE.md | This file. |
-| [docs/DESIGN.md](docs/DESIGN.md) | App architecture — how the three UI surfaces (menu bar, floating panel, settings window) work as one app. SwiftUI/AppKit split, data flow, file layout. |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Full milestone roadmap with per-task checklists, technical research log, closed/open decisions, risk register, competitive gap table. |
-
-_No source code yet._
+| [docs/DESIGN.md](docs/DESIGN.md) | App architecture — the three UI surfaces as one app, SwiftUI/AppKit split, data flow. |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones (now with status), research log, decisions, risk register. |
+| `SafeClipCore/` | SPM package: crypto, Keychain, GRDB store, security scanner. **34 tests** — `swift test --package-path SafeClipCore`. |
+| `App/` | App sources: `main.swift` (AppKit entry), AppDelegate, AppState, Services/, MenuBar/, Panel/, Settings/, Onboarding/. |
+| `project.yml` | XcodeGen spec — regenerate `SafeClip.xcodeproj` with `xcodegen` after editing. |
+| `Config/` | Info.plist (`LSUIElement`), entitlements (empty by design — no sandbox, zero permissions). |
+| `Scripts/` | `smoke_test.sh` (live security assertions), `release.sh` (sign→notarize→dmg). |
+| `.github/workflows/ci.yml` | CI: core tests + zero-warning build gate. |
 
 ---
 
@@ -69,19 +82,20 @@ _No source code yet._
 
 ---
 
-## Build / run (once the project exists — placeholders for now)
+## Build / run
 ```bash
-# Build (M0+):
-xcodebuild -scheme SafeClip -configuration Debug build
-# Open in Xcode:
-open SafeClip.xcodeproj
+xcodegen                                                      # only after editing project.yml
+xcodebuild -project SafeClip.xcodeproj -scheme SafeClip -configuration Debug build
+open SafeClip.xcodeproj                                       # or work in Xcode
+swift test --package-path SafeClipCore                        # core test suite (34 tests)
+Scripts/smoke_test.sh                                         # live security assertions (wipes local history!)
 ```
-**Working rule (carry over from how Mudit likes to work):** after any change, build and fix all warnings/errors before calling a task done. Don't consider it done until the build passes clean.
+**Working rule (how Mudit likes to work):** after any change, build and fix all warnings/errors before calling a task done. Zero warnings — CI enforces it.
 
-### Security smoke tests (run after M1)
+### Security smoke tests (verified passing 10 June 2026)
 ```bash
-strings ~/Library/Application\ Support/SafeClip/history.db   # must show NO clipboard text
-security find-generic-password -s SafeClip                    # key present, ACL-locked
+strings ~/Library/Application\ Support/SafeClip/history.db   # must show NO clipboard text ✅
+security find-generic-password -s SafeClip                    # key present ✅
 ```
 
 ---

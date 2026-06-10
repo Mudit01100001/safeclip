@@ -8,14 +8,14 @@ _Effective date: on first use of the application._
 
 SafeClip is a free, open-source macOS application that stores a local history of your clipboard contents. All data is stored exclusively on your device. SafeClip has no backend servers, no accounts, no telemetry, and no ability to access or transmit your clipboard data to any third party.
 
-The source code is publicly available at [github.com/YOUR_USERNAME/safeclip](https://github.com/YOUR_USERNAME/safeclip) under the MIT License. You can read, audit, fork, and compile it yourself.
+The source code is publicly available at [github.com/Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip) under the MIT License. You can read, audit, fork, and compile it yourself.
 
 ---
 
 ## 2. Your data stays on your device
 
 - SafeClip does not collect, transmit, store remotely, or sell any clipboard data.
-- Clipboard history is stored in an encrypted database on your Mac at `~/.local/share/SafeClip/history.db`. The encryption key is stored in your macOS Keychain and never leaves your device.
+- Clipboard history is stored in an encrypted database on your Mac at `~/Library/Application Support/SafeClip/history.db`. The encryption key is stored in your macOS Keychain and never leaves your device.
 - No analytics, crash reporting, or usage data of any kind is sent to the developers.
 
 **You are solely responsible for the clipboard history stored on your device.** Protect your Mac with a login password, FileVault encryption, and standard device security practices.
@@ -92,7 +92,7 @@ SafeClip uses the following open-source libraries, each under their own licenses
 - `GRDB.swift` — SQLite database (MIT License)
 - `KeyboardShortcuts` — Global hotkey registration (MIT License)
 
-These libraries are not affiliated with SafeClip. Their source code and licenses are available in the `Sources/` directory and in their respective GitHub repositories.
+These libraries are not affiliated with SafeClip. They are fetched as pinned Swift Package Manager dependencies; their source code and licenses are available in their respective GitHub repositories.
 
 ---
 
@@ -104,6 +104,6 @@ Because SafeClip has no accounts or backend, we cannot notify you of changes to 
 
 ## 10. Contact
 
-This is an open-source project. For questions, security disclosures, or bug reports, please open an issue at [github.com/YOUR_USERNAME/safeclip/issues](https://github.com/YOUR_USERNAME/safeclip/issues).
+This is an open-source project. For questions, security disclosures, or bug reports, please open an issue at [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues).
 
 For security vulnerabilities, please use GitHub's private security advisory feature rather than a public issue.

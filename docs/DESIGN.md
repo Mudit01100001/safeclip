@@ -56,20 +56,18 @@ The app sets `LSUIElement = YES` in `Info.plist`. This means:
 - The menu bar icon (`NSStatusItem`) is the only persistent UI
 - Cmd+, and other standard app shortcuts don't fire — we handle shortcuts ourselves
 
-### SwiftUI entry point with AppKit delegate
+### AppKit entry point (implementation delta)
+
+As built, the entry point is a plain `App/main.swift` rather than a SwiftUI
+`App` struct — a `Scene` body can't be empty, and every workaround (dummy
+`Settings` scene, `MenuBarExtra`) fights the imperative three-surface model:
 
 ```swift
-// SafeClipApp.swift
-@main
-struct SafeClipApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-
-    var body: some Scene {
-        // No scenes declared — all UI is managed imperatively by AppDelegate.
-        // This is intentional: NSPanel (non-activating) and NSStatusItem
-        // don't map cleanly to SwiftUI scene lifecycle.
-    }
-}
+// App/main.swift
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()
 ```
 
 `AppDelegate` owns the root `AppState` and hands it to every surface controller at startup.
@@ -116,19 +114,22 @@ Icons are PDF/SVG template images so they respect the menu-bar appearance (dark/
 ### Menu structure
 
 ```
-SafeClip                     ← title item (non-clickable, shows app name)
+Show History (⌃⇧V)           ← opens the floating panel at cursor
 ─────────────────────────────
-Show History      ⌃⇧V        ← opens the floating panel at cursor
+Pause Capture                ← toggle; "Resume Capture" when paused
+Privacy Mode (Hide History)  ← manual hide for screen shares we can't detect
 ─────────────────────────────
-● Capturing                  ← toggle; shows "Paused" when off
+Clear All History…           ← destructive; NSAlert confirmation first
 ─────────────────────────────
-Clear All History…           ← destructive; shows confirmation sheet
-─────────────────────────────
-Preferences…                 ← opens settings window
-About SafeClip               ← standard about panel
+Settings…         ⌘,
+About SafeClip
 ─────────────────────────────
 Quit SafeClip     ⌘Q
 ```
+
+The Privacy Mode item exists because conferencing-app sharing (Zoom, Meet)
+is not detectable without the Screen Recording permission (ROADMAP R12) —
+one click hides history before a call.
 
 "Capturing" is a state-bound `NSMenuItem` with a checkmark. "Clear All History…" presents a `NSAlert` before acting — never destructive on first click.
 
@@ -320,7 +321,7 @@ final class AppState {
 
 ### `ClipboardMonitor`
 
-Polls `NSPasteboard.general.changeCount` every ~200ms on a background thread (macOS 14–15). On macOS 16+, uses the `detect`-before-read API (read type metadata without content, avoiding the per-copy permission prompt). When a change is detected:
+Polls `NSPasteboard.general.changeCount` every ~200ms (a single integer compare on the main run loop; pasteboard *reads* happen only when the count moves). As built, the modern-macOS pasteboard-privacy model is handled with the real API surface — `NSPasteboard.accessBehavior` (15.4+) detects an explicit user deny and degrades to paused-with-guidance; the first background read may trigger the system's one-time consent prompt. The `ClipboardMonitoring` protocol remains the seam for a future detect-before-read implementation. When a change is detected:
 
 1. Check `captureEnabled` — if false, skip.
 2. Check `sourceBundle` against exclusion list — if excluded, skip.

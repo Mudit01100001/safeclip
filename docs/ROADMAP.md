@@ -23,21 +23,24 @@ _Last updated: June 2026. Distribution decided: non-sandboxed, notarized .dmg of
 
 ---
 
-## 1. Where we are
+## 1. Where we are — **BUILT (10 June 2026)**
 
 | Item | Status |
 |------|--------|
 | Product spec (PRD.md) | Complete |
-| Architecture design (docs/DESIGN.md) | Complete |
-| Terms of Use (TERMS.md) | Complete (needs YOUR_USERNAME replaced) |
-| License (MIT) | Complete |
-| Xcode project | **Not started** |
-| Any source code | **None** |
-| Git repo | **Not initialized** |
-| GitHub remote | **Not created** |
-| Distribution decision | **Decided: non-sandboxed .dmg, off-MAS** |
+| Architecture design (docs/DESIGN.md) | Complete (see "implementation deltas" notes) |
+| Terms of Use (TERMS.md) | Complete — username filled, paths corrected |
+| Xcode project + all M0–M5 source | ✅ **Built** — zero warnings, Swift 6 strict concurrency |
+| Core test suite | ✅ 34 tests passing (`SafeClipCore`) |
+| Live security smoke test | ✅ encrypted-on-disk, keychain key, dedup, relaunch persistence |
+| Git repo + GitHub remote | ✅ [Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip) |
+| CI | ✅ `.github/workflows/ci.yml` — tests + zero-warning gate |
+| Notarized release | ⏳ blocked on Developer ID cert (`Scripts/release.sh` ready) |
+| Interactive UI QA | ⏳ needs a human at the keyboard |
 
-**Next action:** initialize git, create GitHub repo, scaffold Xcode project (Milestone M0).
+**Milestone status:** M0 ✅ · M1 ✅ · M2 ✅ (code; interactive QA pending) · M3 ✅ except notarization · M4 ✅ (screen-record detection is heuristic — see R12) · M5 ✅
+
+**Next actions:** interactive QA of the panel and onboarding; Developer ID + first notarized release; product calls (name trademark check, pricing).
 
 ---
 
@@ -440,6 +443,18 @@ Decisions and their research backing, so future sessions don't re-derive them.
 **Decision:** Abstract `ClipboardMonitor` behind a protocol with two concrete implementations.  
 **Research:** macOS 16 (announced WWDC 2025) adds a new "detect-before-read" pasteboard API that checks data types without triggering the "Paste from Other Apps" permission prompt. Without this API, every `NSPasteboard.general.string(forType:)` call on macOS 16 could prompt the user. Using `#available(macOS 16, *)` at runtime and a protocol-based abstraction lets us test both paths and switch cleanly.
 
+### R9 — `Data` slice indices are a real trap (found by test)
+**Finding:** `AES.GCM.SealedBox.ciphertext` is a slice of the combined nonce|ct|tag buffer; concatenating slices preserves `startIndex` (it was 12, not 0), so `blob[0]` traps. `EncryptionService.encrypt` now re-wraps in `Data(_:)` to return canonical zero-based data, and the test asserts `startIndex == 0`.
+
+### R10 — Dedup hash upgraded from SHA-256 to keyed HMAC (deviation from PRD §9, improvement)
+**Why:** a plain SHA-256 of a *low-entropy* secret (a human password) stored in cleartext is offline-guessable by anyone holding the database file. HMAC-SHA256 keyed via HKDF from the master key keeps exact-match dedup while making the hash useless without the Keychain key. Matters precisely because SafeClip captures passwords by design.
+
+### R11 — Pasteboard privacy on current macOS (the PRD's "macOS 16" model)
+**Reality check during the build (macOS 26.5):** the hypothetical detect-before-read API doesn't exist as speced; the real model is `NSPasteboard.accessBehavior` (macOS 15.4+) plus a one-time system prompt on first background read. Implementation: single polling monitor behind the `ClipboardMonitoring` protocol seam; explicit-deny is detected via `accessBehavior` → capture pauses with a menu-bar warning and guidance alert (F5's degrade-gracefully criterion). In the live smoke test on 26.5, capture worked without a prompt for the locally dev-signed build; the deny path stays handled.
+
+### R12 — Screen-record detection is heuristic-only without permissions (limitation accepted)
+**Reality:** every robust "is the screen being recorded/shared" API requires holding the Screen Recording permission ourselves — violating the zero-permission pledge. Shipped: detection of the macOS capture UI (`screencaptureui`) + a one-click **manual Privacy Mode** in the menu bar for conferencing scenarios. F8's "Zoom blurs within 1s" acceptance is **not fully met** and is documented in Settings copy and README. Revisit if users prefer granting the permission for full coverage.
+
 ### R8 — Screen recording detection method
 **Decision:** Use `SCShareableContentInfo` on macOS 15+ (preferred); fall back to `CGDisplayStream` heuristic on macOS 14.  
 **Research:** There is no public "is someone screen recording right now" API as a simple boolean. The closest available on macOS 15+ is checking `SCShareableContentInfo` for active sharing sessions. The `CGDisplayStream` approach (checking if any stream is active) can produce false positives for apps using Metal display streaming internally. Accept this limitation for v1; document it.
@@ -452,12 +467,12 @@ These require a decision before the tagged milestone.
 
 | # | Decision | Needed by | Options | Notes |
 |---|----------|-----------|---------|-------|
-| D1 | **GitHub username / repo URL** | M0 | — | Replace `YOUR_USERNAME` in TERMS.md ×2 |
-| D2 | **Bundle ID** | M0 | `com.mudit.safeclip` or `com.yourname.safeclip` | Used in code signature; hard to change later |
-| D3 | **App name trademark check** | M3 | "SafeClip" (working title) | Check macOS App Store + USPTO before committing |
-| D4 | **Paid vs. free binary** | M3 | $8–12 one-time on GitHub Releases / free | Research favours $8–12; free is also fine for traction |
-| D5 | **macOS 16 launch timing** | M3 | Align with macOS 16 GA (fall 2026) | Aim for maximum narrative tailwind |
-| D6 | **Developer ID certificate** | M3 | Personal ($99/yr Apple Developer Program) | Required for notarization |
+| ~~D1~~ | ~~GitHub username / repo URL~~ | — | — | **Resolved:** `github.com/Mudit01100001/safeclip`; TERMS updated |
+| ~~D2~~ | ~~Bundle ID~~ | — | — | **Resolved:** `com.mudit.safeclip`, signed with team `YHK4D97KC4` |
+| D3 | **App name trademark check** | release | "SafeClip" (working title) | Check macOS App Store + USPTO before committing |
+| D4 | **Paid vs. free binary** | release | $8–12 one-time on GitHub Releases / free | Research favours $8–12; free is also fine for traction |
+| D5 | **Launch timing** | release | Align with macOS 16 GA (fall 2026) | Aim for maximum narrative tailwind |
+| D6 | **Developer ID certificate** | release | Personal ($99/yr Apple Developer Program) | Required for notarization — only remaining release blocker |
 
 ---
 

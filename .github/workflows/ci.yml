@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+
+      - name: Core tests
+        run: swift test --package-path SafeClipCore
+
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          xcodegen
+
+      # Zero-warnings build gate (CLAUDE.md working rule).
+      - name: Build app (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project SafeClip.xcodeproj -scheme SafeClip \
+            -configuration Debug build \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            | tee build.log
+          if grep -E "warning: " build.log | grep -v "appintentsmetadataprocessor"; then
+            echo "::error::warnings found — zero-warnings policy"; exit 1
+          fi

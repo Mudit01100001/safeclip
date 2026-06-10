@@ -24,6 +24,8 @@ settings:
     LM_SKIP_METADATA_EXTRACTION: YES  # no AppIntents — silence the metadata tool
 
 targets:
+  # GitHub channel: non-sandboxed, Hardened Runtime, Developer ID + notarized
+  # .dmg via Scripts/release.sh. The original (Session 2) distribution target.
   SafeClip:
     type: application
     platform: macOS
@@ -36,6 +38,36 @@ targets:
         INFOPLIST_FILE: Config/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: Config/SafeClip.entitlements
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Development"
+        DEVELOPMENT_TEAM: YHK4D97KC4
+        SWIFT_EMIT_LOC_STRINGS: NO
+    dependencies:
+      - package: SafeClipCore
+        product: SafeClipCore
+      - package: KeyboardShortcuts
+        product: KeyboardShortcuts
+    scheme:
+      testTargets: []
+
+  # Mac App Store channel (Session 4): identical sources, App Sandbox on.
+  # Same bundle ID — it's the same app, one channel installed at a time.
+  # Archive with Apple Distribution signing via Xcode Organizer/Transporter.
+  # Note: the sandboxed build keeps its history in its container
+  # (~/Library/Containers/com.mudit.safeclip), separate from the GitHub
+  # build's ~/Library/Application Support — see docs/DISTRIBUTION.md.
+  SafeClip-MAS:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip
+        PRODUCT_NAME: SafeClip
+        INFOPLIST_FILE: Config/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Config/SafeClip-MAS.entitlements
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "Apple Development"
         DEVELOPMENT_TEAM: YHK4D97KC4

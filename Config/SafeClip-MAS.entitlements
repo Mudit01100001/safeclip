@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	Mac App Store variant (decision revised Session 4 — see ROADMAP R14).
+	App Sandbox is mandatory for MAS. Everything SafeClip does survives it:
+	pasteboard polling, Carbon hotkeys (KeyboardShortcuts), SMAppService,
+	Keychain, NSWorkspace.frontmostApplication. The user-selected entitlement
+	covers the powerbox panels: the exclusion-list app picker (NSOpenPanel)
+	and history export (NSSavePanel). No network entitlements — SafeClip
+	never talks to a network, which is the point.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+</dict>
+</plist>

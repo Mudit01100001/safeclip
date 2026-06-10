@@ -24,8 +24,8 @@ jobs:
           brew install xcodegen
           xcodegen
 
-      # Zero-warnings build gate (CLAUDE.md working rule).
-      - name: Build app (unsigned)
+      # Zero-warnings build gate (CLAUDE.md working rule) — both channels.
+      - name: Build GitHub variant (unsigned)
         run: |
           set -o pipefail
           xcodebuild -project SafeClip.xcodeproj -scheme SafeClip \
@@ -33,5 +33,16 @@ jobs:
             CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
             | tee build.log
           if grep -E "warning: " build.log | grep -v "appintentsmetadataprocessor"; then
+            echo "::error::warnings found — zero-warnings policy"; exit 1
+          fi
+
+      - name: Build App Store variant (unsigned, sandboxed)
+        run: |
+          set -o pipefail
+          xcodebuild -project SafeClip.xcodeproj -scheme SafeClip-MAS \
+            -configuration Debug build \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            | tee build-mas.log
+          if grep -E "warning: " build-mas.log | grep -v "appintentsmetadataprocessor"; then
             echo "::error::warnings found — zero-warnings policy"; exit 1
           fi

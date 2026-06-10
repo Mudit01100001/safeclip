@@ -15,7 +15,7 @@ _Last updated: 10 June 2026 (Session 3 — **full build, M0–M5 implemented**).
 3. **Notarized release** — needs a paid Apple Developer account + "Developer ID Application" cert, then `Scripts/release.sh` does build→sign→notarize→staple→dmg. Until then, local builds sign with the Apple Development cert (team `YHK4D97KC4`).
 4. Open product calls: app name trademark check, paid-vs-free (PRD §19).
 
-**Sandbox decision (Session 2):** Non-sandboxed, Hardened Runtime on, notarized `.dmg` off GitHub Releases. No Mac App Store target.
+**Distribution (revised Session 4 — dual-channel):** one repo, **two targets** sharing all sources. `SafeClip` = GitHub channel (non-sandboxed, Hardened Runtime, Developer ID → notarized `.dmg`). `SafeClip-MAS` = Mac App Store channel (App Sandbox; verified booting in its container). Do NOT fork into separate folders. Channel comparison + MAS submission checklist: [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md). MAS blockers: Apple Developer account, Apple Distribution cert, **app icon (none exists yet)**.
 
 ### What this project is
 A **privacy-first macOS clipboard manager**. The differentiators — none of which any mainstream competitor (Maccy, Paste, CleanClip, CopyClip, Raycast) currently ships:
@@ -86,9 +86,10 @@ Full milestone detail + deltas from plan: [docs/ROADMAP.md](docs/ROADMAP.md).
 ## Build / run
 ```bash
 xcodegen                                                      # only after editing project.yml
-xcodebuild -project SafeClip.xcodeproj -scheme SafeClip -configuration Debug build
+xcodebuild -project SafeClip.xcodeproj -scheme SafeClip -configuration Debug build      # GitHub variant
+xcodebuild -project SafeClip.xcodeproj -scheme SafeClip-MAS -configuration Debug build  # App Store variant (sandboxed)
 open SafeClip.xcodeproj                                       # or work in Xcode
-swift test --package-path SafeClipCore                        # core test suite (34 tests)
+swift test --package-path SafeClipCore                        # core test suite (40 tests)
 Scripts/smoke_test.sh                                         # live security assertions (wipes local history!)
 ```
 **Working rule (how Mudit likes to work):** after any change, build and fix all warnings/errors before calling a task done. Zero warnings — CI enforces it.

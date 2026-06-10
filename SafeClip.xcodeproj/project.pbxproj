@@ -8,24 +8,45 @@
 
 /* Begin PBXBuildFile section */
 		0128650B0F671694446C08BF /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FC85E847A57EAEBC802449 /* MenuBarController.swift */; };
+		06225DF0F5808E02E17B9A60 /* ClipboardPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8110AD2FFFB61991E97A8AB /* ClipboardPanelView.swift */; };
 		0E7231A7AC9770313DE9B6F5 /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4FEC8304AF5BC53C53AC1C /* Shortcuts.swift */; };
+		12EDD11B60047B54D7B48DAC /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F42FD9B0FCAF542871565C /* GeneralSettingsView.swift */; };
 		1C3E440A12D05B69CAB419B4 /* ClipboardPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8110AD2FFFB61991E97A8AB /* ClipboardPanelView.swift */; };
+		1E345C0E16E1552DC795BA53 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A2C4787E518FD5034E79291 /* AppDelegate.swift */; };
 		28AEC11230F8DD3FE9FEEA3D /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C568ADBC94E2D2E16C614B09 /* AppState.swift */; };
+		3B4D880EA54EAC3497C7D74E /* ClipboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964B230BAC874D85DAFE3958 /* ClipboardMonitor.swift */; };
+		41FBC5376511CF1F4EC1DF5D /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC4B9AF6278F8DE2023A8FB0 /* main.swift */; };
+		457046E1A558960806F8C69C /* FloatingPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34073832F3745835BCD23A80 /* FloatingPanelController.swift */; };
 		46795EAE46E87866CAC11109 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFFC11E2FB44609C52CA450C /* PrivacySettingsView.swift */; };
 		539713335B3CFA303873740E /* FloatingPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34073832F3745835BCD23A80 /* FloatingPanelController.swift */; };
+		5C403109B49D0F09BED21779 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFFC11E2FB44609C52CA450C /* PrivacySettingsView.swift */; };
 		65105E890A95EA8CE5AB7674 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = E9D596B3E29E66FAB42C84D2 /* KeyboardShortcuts */; };
 		653C559F94023F84B9875D21 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC4B9AF6278F8DE2023A8FB0 /* main.swift */; };
+		658869B63357B9BC85545749 /* PanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA873496988F4683229E497A /* PanelViewModel.swift */; };
 		67085374749A894AEDB89D73 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 612D7BECDA35FA09612E3849 /* OnboardingWindowController.swift */; };
 		69EEFA1D4AB9F7DF865EDCD9 /* ClipboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964B230BAC874D85DAFE3958 /* ClipboardMonitor.swift */; };
 		8D68AE409FA6C8F6D7225B87 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62B7BE197BAA4E64B7965F9 /* AboutView.swift */; };
+		94A884D1BA7E6E51FADD4BA7 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C568ADBC94E2D2E16C614B09 /* AppState.swift */; };
+		9C424823F53F4DFBB450A779 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62B7BE197BAA4E64B7965F9 /* AboutView.swift */; };
+		9DA55600B98E75BB9482222A /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4FEC8304AF5BC53C53AC1C /* Shortcuts.swift */; };
 		9DF924C1E7966F0C31B74C7F /* PanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA873496988F4683229E497A /* PanelViewModel.swift */; };
+		AA80DC4840E858AD3502D8DE /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51A21C8E2CDC291B4BDA5E20 /* SettingsWindowController.swift */; };
 		AAB0F2CC06FF816014A9394B /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90012535C28160CD724DA632 /* AdvancedSettingsView.swift */; };
+		AD3CC89A8D42F717B2EF5841 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04FD0E1D22B603D68E04C13 /* OnboardingView.swift */; };
 		AF153885848BE8A6F04A7A33 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A2C4787E518FD5034E79291 /* AppDelegate.swift */; };
 		B2A0749B9662BDBCF59CE55A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04FD0E1D22B603D68E04C13 /* OnboardingView.swift */; };
+		B5B2FF557857D2FDF9E856C3 /* ScreenRecordWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D5CA5CB5D24EF4D10BAC9A /* ScreenRecordWatcher.swift */; };
 		BA42914A0F1CA4497627744D /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51A21C8E2CDC291B4BDA5E20 /* SettingsWindowController.swift */; };
+		BC0BF1365BD2235A7E41C73D /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FC85E847A57EAEBC802449 /* MenuBarController.swift */; };
+		C39F22DD9B1E4A673B27402B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6801661ECA6F598596C0F7C5 /* SettingsView.swift */; };
+		CA88BDF8CD2458F02182A516 /* PasteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07B648FAFA61C7BE38D50BC1 /* PasteService.swift */; };
 		CD2127BA3012687C7D57AB40 /* ScreenRecordWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D5CA5CB5D24EF4D10BAC9A /* ScreenRecordWatcher.swift */; };
+		D924B050DCC9D8541096AF49 /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90012535C28160CD724DA632 /* AdvancedSettingsView.swift */; };
 		DC67CEDCA3E9BA28E25977AD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6801661ECA6F598596C0F7C5 /* SettingsView.swift */; };
+		DD9999EC4D9035C09A375DC1 /* SafeClipCore in Frameworks */ = {isa = PBXBuildFile; productRef = 77298084AA8653A4B88C5AFF /* SafeClipCore */; };
+		E759D5E9384FB934DCB6501E /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 8306D7E9D90BD55FF1A4D918 /* KeyboardShortcuts */; };
 		EFD185F585A3B28D104EE8F4 /* PasteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07B648FAFA61C7BE38D50BC1 /* PasteService.swift */; };
+		F3140D161E5357829E646D32 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 612D7BECDA35FA09612E3849 /* OnboardingWindowController.swift */; };
 		F7A77084F606ED7F06E2F439 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F42FD9B0FCAF542871565C /* GeneralSettingsView.swift */; };
 		FED54768366116D622DBE92E /* SafeClipCore in Frameworks */ = {isa = PBXBuildFile; productRef = BD312F4F3D73DA48CCF5DCB9 /* SafeClipCore */; };
 /* End PBXBuildFile section */
@@ -42,6 +63,7 @@
 		6801661ECA6F598596C0F7C5 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		69F42FD9B0FCAF542871565C /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		70D5CA5CB5D24EF4D10BAC9A /* ScreenRecordWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordWatcher.swift; sourceTree = "<group>"; };
+		79BD2F818504C0C59DACDC65 /* SafeClip-MAS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "SafeClip-MAS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		90012535C28160CD724DA632 /* AdvancedSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsView.swift; sourceTree = "<group>"; };
 		964B230BAC874D85DAFE3958 /* ClipboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardMonitor.swift; sourceTree = "<group>"; };
 		A1FC85E847A57EAEBC802449 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
@@ -55,6 +77,15 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		13B006833FDF7E561404A754 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD9999EC4D9035C09A375DC1 /* SafeClipCore in Frameworks */,
+				E759D5E9384FB934DCB6501E /* KeyboardShortcuts in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		828AF45FAC83DCE87ECE8308 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -80,6 +111,7 @@
 		3BB0FBBA15FC907DBFC1F471 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				79BD2F818504C0C59DACDC65 /* SafeClip-MAS.app */,
 				1E23B201DB72D0FD608F7ED5 /* SafeClip.app */,
 			);
 			name = Products;
@@ -161,6 +193,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		79645718877B3B14304740F9 /* SafeClip-MAS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AEB19FDA065AA49D2DF251AE /* Build configuration list for PBXNativeTarget "SafeClip-MAS" */;
+			buildPhases = (
+				C48A6AED74942B96D0493CA0 /* Sources */,
+				13B006833FDF7E561404A754 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "SafeClip-MAS";
+			packageProductDependencies = (
+				77298084AA8653A4B88C5AFF /* SafeClipCore */,
+				8306D7E9D90BD55FF1A4D918 /* KeyboardShortcuts */,
+			);
+			productName = "SafeClip-MAS";
+			productReference = 79BD2F818504C0C59DACDC65 /* SafeClip-MAS.app */;
+			productType = "com.apple.product-type.application";
+		};
 		A0972D2EF8014F274C06E342 /* SafeClip */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 85EDF682E7A0E709C2918A25 /* Build configuration list for PBXNativeTarget "SafeClip" */;
@@ -190,6 +242,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					79645718877B3B14304740F9 = {
+						DevelopmentTeam = YHK4D97KC4;
+						ProvisioningStyle = Manual;
+					};
 					A0972D2EF8014F274C06E342 = {
 						DevelopmentTeam = YHK4D97KC4;
 						ProvisioningStyle = Manual;
@@ -215,11 +271,38 @@
 			projectRoot = "";
 			targets = (
 				A0972D2EF8014F274C06E342 /* SafeClip */,
+				79645718877B3B14304740F9 /* SafeClip-MAS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C48A6AED74942B96D0493CA0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9C424823F53F4DFBB450A779 /* AboutView.swift in Sources */,
+				D924B050DCC9D8541096AF49 /* AdvancedSettingsView.swift in Sources */,
+				1E345C0E16E1552DC795BA53 /* AppDelegate.swift in Sources */,
+				94A884D1BA7E6E51FADD4BA7 /* AppState.swift in Sources */,
+				3B4D880EA54EAC3497C7D74E /* ClipboardMonitor.swift in Sources */,
+				06225DF0F5808E02E17B9A60 /* ClipboardPanelView.swift in Sources */,
+				457046E1A558960806F8C69C /* FloatingPanelController.swift in Sources */,
+				12EDD11B60047B54D7B48DAC /* GeneralSettingsView.swift in Sources */,
+				BC0BF1365BD2235A7E41C73D /* MenuBarController.swift in Sources */,
+				AD3CC89A8D42F717B2EF5841 /* OnboardingView.swift in Sources */,
+				F3140D161E5357829E646D32 /* OnboardingWindowController.swift in Sources */,
+				658869B63357B9BC85545749 /* PanelViewModel.swift in Sources */,
+				CA88BDF8CD2458F02182A516 /* PasteService.swift in Sources */,
+				5C403109B49D0F09BED21779 /* PrivacySettingsView.swift in Sources */,
+				B5B2FF557857D2FDF9E856C3 /* ScreenRecordWatcher.swift in Sources */,
+				C39F22DD9B1E4A673B27402B /* SettingsView.swift in Sources */,
+				AA80DC4840E858AD3502D8DE /* SettingsWindowController.swift in Sources */,
+				9DA55600B98E75BB9482222A /* Shortcuts.swift in Sources */,
+				41FBC5376511CF1F4EC1DF5D /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D4D2C3CE229808329621A749 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -292,6 +375,28 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 			};
 			name = Release;
+		};
+		7B403A7DE4F98987E1E87E44 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Config/SafeClip-MAS.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = YHK4D97KC4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mudit.safeclip;
+				PRODUCT_NAME = SafeClip;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
 		};
 		B7954789A4A745360E0EEB11 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -422,6 +527,28 @@
 			};
 			name = Debug;
 		};
+		E55684983CBDD95163262D3B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "Config/SafeClip-MAS.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = YHK4D97KC4;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mudit.safeclip;
+				PRODUCT_NAME = SafeClip;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -439,6 +566,15 @@
 			buildConfigurations = (
 				D21A14B7AFAA44B139E14FCE /* Debug */,
 				B7954789A4A745360E0EEB11 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AEB19FDA065AA49D2DF251AE /* Build configuration list for PBXNativeTarget "SafeClip-MAS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7B403A7DE4F98987E1E87E44 /* Debug */,
+				E55684983CBDD95163262D3B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -464,6 +600,15 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		77298084AA8653A4B88C5AFF /* SafeClipCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SafeClipCore;
+		};
+		8306D7E9D90BD55FF1A4D918 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3ED9342A49A271A08254E5BC /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
 		BD312F4F3D73DA48CCF5DCB9 /* SafeClipCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SafeClipCore;

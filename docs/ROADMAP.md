@@ -455,6 +455,9 @@ Decisions and their research backing, so future sessions don't re-derive them.
 ### R12 — Screen-record detection is heuristic-only without permissions (limitation accepted)
 **Reality:** every robust "is the screen being recorded/shared" API requires holding the Screen Recording permission ourselves — violating the zero-permission pledge. Shipped: detection of the macOS capture UI (`screencaptureui`) + a one-click **manual Privacy Mode** in the menu bar for conferencing scenarios. F8's "Zoom blurs within 1s" acceptance is **not fully met** and is documented in Settings copy and README. Revisit if users prefer granting the permission for full coverage.
 
+### R14 — Dual-channel distribution: one repo, two targets (Session 4)
+**Ask was "GitHub variant in a different folder"; shipped shape is two xcodegen targets** sharing 100% of sources — a copied folder would diverge immediately and double every future change. `SafeClip` = GitHub (non-sandboxed, Developer ID, notarized dmg). `SafeClip-MAS` = App Store (App Sandbox + `user-selected.read-write` for the powerbox panels). Verified: both targets build zero-warning; the MAS build boots sandboxed and creates its encrypted store inside its container. Same bundle ID across channels (same app, one installed at a time); histories live in different locations per channel (container vs ~/Library/Application Support). MAS submission blockers: Apple Developer account, Apple Distribution signing, **app icon** (none exists yet). Full channel comparison: docs/DISTRIBUTION.md.
+
 ### R13 — v0.2.0: images, file copies, Liquid Glass (owner-revised scope, June 10 2026)
 **What changed:** PRD §13's "no images/files in v1" non-goal was revised by owner decision. Schema v2 adds `kind` (`text`/`image`/`file_list`) + encrypted thumbnail columns; migration tested against a frozen v1 database.
 **Images:** stored encrypted, PNG-normalized (deterministic dedup; dedup hashes the *payload bytes*, since the "Image W×H" placeholder would collide distinct images), 10 MB cap, 96px encrypted thumbnail for the row preview. Pasting writes an `NSImage` (PNG+TIFF reps for receiver compatibility); the plain/rich modifier is ignored for images.
@@ -488,7 +491,7 @@ These require a decision before the tagged milestone.
 
 | Decision | What was decided | Reason |
 |----------|-----------------|--------|
-| Sandbox stance | Non-sandboxed, notarized .dmg, off-MAS | Simpler; no MAS target. Hardened Runtime on for notarization. |
+| Sandbox stance | ~~Non-sandboxed, notarized .dmg, off-MAS~~ **Revised Session 4: dual-channel.** GitHub target stays non-sandboxed; a second `SafeClip-MAS` target (App Sandbox) shares all sources for App Store distribution. See R14 + docs/DISTRIBUTION.md. | Owner wants both channels; one repo + two targets avoids codebase divergence. |
 | Accessibility permission | Never request it | Would allow keystroke injection = same power as a keylogger. Core design pillar. |
 | Synthesized ⌘V | No — user presses it | Requires Accessibility. One extra keypress accepted. |
 | "Burn after paste" scope | Per-item opt-in, NOT global default | History persistence is the whole point of a clipboard manager |

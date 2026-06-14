@@ -49,9 +49,20 @@ Every mainstream macOS clipboard manager stores your history as plaintext on dis
 
 ## Install
 
-**Download:** grab the notarized `.dmg` from [Releases](https://github.com/Mudit01100001/safeclip/releases). On first capture, macOS may show a one-time clipboard-access prompt — choose *Always Allow*.
+### Download (quickest)
 
-**Build from source** (the high-trust path):
+1. Go to [Releases](https://github.com/Mudit01100001/safeclip/releases) and download the latest `SafeClip-vX.Y.Z-unsigned.zip`
+2. Unzip and move `SafeClip.app` to `/Applications`
+3. **Bypass Gatekeeper** (required for unsigned builds):
+   - **Right-click** `SafeClip.app` → **Open** → click **Open** in the warning dialog, _or_
+   - Run in Terminal: `xattr -d com.apple.quarantine /Applications/SafeClip.app`
+4. SafeClip opens normally from that point on
+
+> **Why unsigned?** Notarisation requires a paid Apple Developer ID certificate. A signed release is planned once that's in place. Until then, builds are produced by CI — you can verify the SHA-256 checksum on the release page matches the file you downloaded.
+
+On first clipboard capture, macOS may show a one-time access prompt — choose **Always Allow**.
+
+### Build from source (highest trust)
 
 ```bash
 git clone https://github.com/Mudit01100001/safeclip.git
@@ -73,6 +84,7 @@ Requires Xcode 16+ / macOS 14+. Run the test suite with `cd SafeClipCore && swif
 | `docs/ROADMAP.md` | Milestones, research log, decisions |
 | `PRD.md` | Full product spec |
 | `TERMS.md` | Terms of Use — including the disclosed limitations |
+| `PRIVACY.md` | Privacy Policy — DPDP Act 2023 compliant; Grievance Officer contact |
 
 Dependencies: [GRDB.swift](https://github.com/groue/GRDB.swift) (MIT) and [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) (MIT). Both pinned, both auditable.
 

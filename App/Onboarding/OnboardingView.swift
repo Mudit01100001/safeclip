@@ -2,15 +2,25 @@ import AppKit
 import KeyboardShortcuts
 import SwiftUI
 
-/// Three screens (PRD §7): terms consent → shortcut → privacy posture.
+struct OnboardingResult {
+    let acceptedTerms: Bool
+    let acceptedPrivacy: Bool
+    let acceptedMarketing: Bool
+}
+
+/// Three screens (PRD §7): terms + privacy consent → shortcut → privacy posture.
 struct OnboardingView: View {
     let appState: AppState
-    let onFinish: (_ acceptedTerms: Bool) -> Void
+    let onFinish: (_ result: OnboardingResult) -> Void
 
     @State private var page = 0
-    @State private var termsUnderstood = false
+    @State private var termsAccepted = false
+    @State private var privacyAccepted = false
+    @State private var marketingAccepted = false
+    @State private var showingTerms = false
+    @State private var showingPrivacy = false
 
-    private static let termsURL = URL(string: "https://github.com/Mudit01100001/safeclip/blob/main/TERMS.md")!
+    private var canContinueFromPage0: Bool { termsAccepted && privacyAccepted }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,31 +37,74 @@ struct OnboardingView: View {
             Divider()
             footer
         }
+        .sheet(isPresented: $showingTerms) {
+            LegalDocumentSheet(resourceName: "TERMS", title: "Terms of Use")
+        }
+        .sheet(isPresented: $showingPrivacy) {
+            LegalDocumentSheet(resourceName: "PRIVACY", title: "Privacy Policy")
+        }
     }
 
-    // MARK: - Page 1: Welcome + Terms
+    // MARK: - Page 1: Welcome + Consent
 
     private var welcomePage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             header(symbol: "list.clipboard", title: "Welcome to SafeClip",
                    subtitle: "A clipboard manager that is private by design.")
 
-            bullet("lock.shield", "History is encrypted on disk",
-                   "AES-256, key in your macOS Keychain. A stolen disk or backup can't read it.")
+            bullet("lock.shield", "Encrypted history on disk",
+                   "AES-256, key in your macOS Keychain. A stolen disk or backup reveals nothing.")
             bullet("network.slash", "Nothing ever leaves your Mac",
-                   "No servers, no accounts, no telemetry. The source code is public, so this is checkable.")
+                   "No servers, no accounts, no telemetry. Source code is public and auditable.")
             bullet("hand.raised", "Honest about its limits",
-                   "While you paste, the text briefly sits on the system clipboard where other apps could read it — true of every clipboard manager. SafeClip discloses it instead of overpromising.")
+                   "While you paste, text briefly sits on the system clipboard — true of every clipboard manager. We disclose it.")
 
             Spacer()
 
-            Toggle(isOn: $termsUnderstood) {
-                HStack(spacing: 4) {
-                    Text("I have read and understand the")
-                    Link("Terms of Use", destination: Self.termsURL)
+            VStack(alignment: .leading, spacing: 10) {
+                consentRow(
+                    checked: $termsAccepted,
+                    label: "I have read and agree to the Terms of Use",
+                    buttonLabel: "View Terms",
+                    action: { showingTerms = true }
+                )
+                consentRow(
+                    checked: $privacyAccepted,
+                    label: "I have read and agree to the Privacy Policy",
+                    buttonLabel: "View Policy",
+                    action: { showingPrivacy = true }
+                )
+                Divider()
+                Toggle(isOn: $marketingAccepted) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Send me release announcements and updates")
+                            .font(.callout)
+                        Text("Optional — via GitHub; unsubscribe any time")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .toggleStyle(.checkbox)
             }
-            .toggleStyle(.checkbox)
+        }
+    }
+
+    private func consentRow(
+        checked: Binding<Bool>,
+        label: String,
+        buttonLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 8) {
+            Toggle(isOn: checked) { EmptyView() }
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+            Text(label).font(.callout)
+            Spacer()
+            Button(buttonLabel, action: action)
+                .font(.callout)
+                .buttonStyle(.borderless)
+                .foregroundStyle(.tint)
         }
     }
 
@@ -129,9 +182,13 @@ struct OnboardingView: View {
 
     private var footer: some View {
         HStack {
-            Button("Skip") { onFinish(false) }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+            Button("Skip") {
+                onFinish(OnboardingResult(
+                    acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false
+                ))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
             Spacer()
             if page > 0 {
                 Button("Back") { page -= 1 }
@@ -140,11 +197,17 @@ struct OnboardingView: View {
                 Button("Continue") { page += 1 }
                     .keyboardShortcut(.defaultAction)
                     .prominentGlassWhenAvailable()
-                    .disabled(page == 0 && !termsUnderstood)
+                    .disabled(page == 0 && !canContinueFromPage0)
             } else {
-                Button("Start Using SafeClip") { onFinish(termsUnderstood) }
-                    .keyboardShortcut(.defaultAction)
-                    .prominentGlassWhenAvailable()
+                Button("Start Using SafeClip") {
+                    onFinish(OnboardingResult(
+                        acceptedTerms: termsAccepted,
+                        acceptedPrivacy: privacyAccepted,
+                        acceptedMarketing: marketingAccepted
+                    ))
+                }
+                .keyboardShortcut(.defaultAction)
+                .prominentGlassWhenAvailable()
             }
         }
         .padding(16)

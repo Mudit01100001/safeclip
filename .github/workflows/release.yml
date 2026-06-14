@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select newest Xcode on runner
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Core tests
+        run: swift test --package-path SafeClipCore
+
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          xcodegen
+
+      - name: Build (unsigned Release)
+        run: |
+          set -o pipefail
+          xcodebuild -project SafeClip.xcodeproj -scheme SafeClip \
+            -configuration Release \
+            -derivedDataPath dist \
+            build \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            | tee build.log
+          if grep -E "^.* warning: " build.log | grep -v "appintentsmetadataprocessor"; then
+            echo "::error::warnings found — zero-warnings policy"; exit 1
+          fi
+
+      - name: Package zip
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ditto -c -k --keepParent \
+            "dist/Build/Products/Release/SafeClip.app" \
+            "SafeClip-${VERSION}-unsigned.zip"
+          echo "RELEASE_ZIP=SafeClip-${VERSION}-unsigned.zip" >> "$GITHUB_ENV"
+          echo "CHECKSUM=$(shasum -a 256 "SafeClip-${VERSION}-unsigned.zip" | awk '{print $1}')" \
+            >> "$GITHUB_ENV"
+
+      - name: Write release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          cat > release-notes.md << EOF
+          ## SafeClip ${VERSION}
+
+          ### ⚠️ Unsigned build — Gatekeeper will warn on first launch
+
+          This release is built by CI and has not yet been notarised by Apple
+          (notarisation requires a paid Developer ID certificate — coming later).
+          macOS will block the app on first open. To bypass:
+
+          **Option A — right-click:**
+          1. Download and unzip \`${RELEASE_ZIP}\`
+          2. Right-click \`SafeClip.app\` → **Open**
+          3. Click **Open** in the warning dialog
+          4. SafeClip launches normally from then on
+
+          **Option B — Terminal (one command):**
+          \`\`\`sh
+          xattr -d com.apple.quarantine /path/to/SafeClip.app
+          \`\`\`
+          Then double-click to open normally.
+
+          ### SHA-256 checksum
+          \`\`\`
+          ${CHECKSUM}  ${RELEASE_ZIP}
+          \`\`\`
+          Verify with: \`shasum -a 256 ${RELEASE_ZIP}\`
+
+          ### Build from source (highest trust)
+          See the [README](https://github.com/Mudit01100001/safeclip#install) — only Xcode 16+ required.
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "SafeClip ${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            "${RELEASE_ZIP}"

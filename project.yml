@@ -31,6 +31,8 @@ targets:
     platform: macOS
     sources:
       - path: App
+      - path: TERMS.md
+      - path: PRIVACY.md
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip
@@ -61,6 +63,8 @@ targets:
     platform: macOS
     sources:
       - path: App
+      - path: TERMS.md
+      - path: PRIVACY.md
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip

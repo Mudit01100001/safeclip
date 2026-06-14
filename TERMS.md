@@ -80,8 +80,9 @@ The only requirement is that you include the original copyright notice and licen
 
 If you download a pre-built binary from GitHub Releases rather than compiling from source:
 
-- Binaries are notarized with Apple's notarisation service, which checks for known malware. Notarisation is not an endorsement and does not guarantee the absence of all vulnerabilities.
-- You are trusting that the binary matches the source code in this repository. We encourage users with high security requirements to compile from source.
+- **Unsigned builds** (current): GitHub Release binaries are built by CI and are not notarised by Apple. macOS Gatekeeper will show a warning on first launch — see the README for how to bypass it (right-click → Open, or `xattr -d com.apple.quarantine SafeClip.app`). You are trusting the CI build log and the source code in this repository.
+- **Notarised builds** (future): When a paid Apple Developer ID certificate is available, releases will be notarised. Notarisation checks for known malware but is not an endorsement and does not guarantee the absence of all vulnerabilities.
+- For maximum trust, compile from source. The README has full instructions.
 
 ---
 
@@ -102,8 +103,26 @@ Because SafeClip has no accounts or backend, we cannot notify you of changes to 
 
 ---
 
-## 10. Contact
+## 10. Privacy Policy
 
-This is an open-source project. For questions, security disclosures, or bug reports, please open an issue at [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues).
+SafeClip's Privacy Policy — including details of what data is stored on your device, your rights under India's Digital Personal Data Protection Act 2023, and our Grievance Officer contact — is in [PRIVACY.md](PRIVACY.md).
+
+---
+
+## 11. Grievance Officer (DPDP Act 2023)
+
+In accordance with India's Digital Personal Data Protection Act 2023, the designated Grievance Officer is:
+
+**Mudit Ahlawat**
+Email: m14ahlawat@gmail.com
+GitHub: [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues)
+
+Grievances are acknowledged within 72 hours and resolved within 7 working days.
+
+---
+
+## 12. Contact
+
+This is an open-source project. For questions, bug reports, or feedback, please open an issue at [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues).
 
 For security vulnerabilities, please use GitHub's private security advisory feature rather than a public issue.

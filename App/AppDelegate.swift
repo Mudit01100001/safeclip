@@ -105,11 +105,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             monitor.start()
         } else {
-            let onboarding = OnboardingWindowController(appState: state) { [weak self] accepted in
+            let onboarding = OnboardingWindowController(appState: state) { [weak self] result in
                 let defaults = UserDefaults.standard
                 defaults.set(true, forKey: "hasCompletedOnboarding")
-                defaults.set(accepted, forKey: "hasAcceptedTerms")
+                defaults.set(result.acceptedTerms, forKey: "hasAcceptedTerms")
+                defaults.set(result.acceptedPrivacy, forKey: "hasAcceptedPrivacyPolicy")
+                defaults.set(result.acceptedMarketing, forKey: "hasAcceptedMarketing")
                 defaults.set("1.0", forKey: "termsVersion")
+                defaults.set("1.0", forKey: "privacyPolicyVersion")
                 defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")
                 self?.onboardingController = nil
                 self?.monitor?.start()

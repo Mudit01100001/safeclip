@@ -35,7 +35,7 @@ struct LegalDocumentSheet: View {
             let raw = try? String(contentsOf: url, encoding: .utf8),
             let parsed = try? AttributedString(
                 markdown: raw,
-                options: .init(interpretedSyntax: .inlinesOnlyPreservingWhitespace)
+                options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
             )
         else {
             content = AttributedString(

@@ -35,7 +35,17 @@ struct AdvancedSettingsView: View {
                     isOn: appState.settingsBinding(\.clickFixDetection)
                 )
             } footer: {
-                Text("Warns when the clipboard was overwritten by a website with something that looks like a shell command — the #1 macOS malware-delivery trick. Warnings never block pasting.")
+                Text("On by default. Warns when the clipboard was overwritten by a website with something that looks like a shell command — the #1 macOS malware-delivery trick. Warnings never block pasting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Reset All Flags") { appState.resetAllFlags() }
+            } header: {
+                Text("Flags")
+            } footer: {
+                Text("Clears the warning/password marks on every stored item and un-masks their previews. History and pins are kept. Use this if items were mislabeled by an earlier scan.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

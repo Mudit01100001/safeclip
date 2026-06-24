@@ -77,6 +77,21 @@ struct HistoryStoreTests {
         #expect(item.flagReason == .apiKey)
     }
 
+    @Test func unconcealSourceClearsOnlyThatSource() throws {
+        let store = try makeStore()
+        _ = try store.insert(CaptureInput(plainText: "dictated text", sourceBundle: "com.electron.wispr-flow", flagReason: .concealed))
+        _ = try store.insert(CaptureInput(plainText: "real password", sourceBundle: "com.1password.1password", flagReason: .concealed))
+        _ = try store.insert(CaptureInput(plainText: "an api key", sourceBundle: "com.electron.wispr-flow", flagReason: .apiKey))
+
+        let cleared = try store.unconcealSource("com.electron.wispr-flow")
+        #expect(cleared == 1, "only the concealed Wispr row is cleared")
+
+        let byText = Dictionary(uniqueKeysWithValues: try store.fetchAll().map { ($0.plainText, $0) })
+        #expect(byText["dictated text"]?.flagReason == nil, "Wispr concealed row un-masked")
+        #expect(byText["real password"]?.flagReason == .concealed, "other sources untouched")
+        #expect(byText["an api key"]?.flagReason == .apiKey, "non-concealed flags on the same source untouched")
+    }
+
     @Test func deleteRemovesRow() throws {
         let store = try makeStore()
         guard case .inserted(let id) = try store.insert(CaptureInput(plainText: "to delete")) else {
@@ -182,5 +197,66 @@ struct HistoryStoreTests {
         #expect(item.charCount == huge.count, "char_count keeps the original length")
         #expect(item.plainText.count == HistoryStore.maxStoredCharacters + 1, "stored text capped + ellipsis")
         #expect(item.plainText.hasSuffix("⋯"))
+    }
+
+    // MARK: - Categories (v3)
+
+    @Test func categoryRoundTripsAndClears() throws {
+        let store = try makeStore()
+        guard case .inserted(let id) = try store.insert(CaptureInput(plainText: "a clip")) else {
+            Issue.record("expected .inserted"); return
+        }
+        #expect(try store.fetchAll().first?.category == nil)
+
+        try store.setCategory(id: id, "Work")
+        #expect(try store.fetchAll().first?.category == "Work")
+
+        // Whitespace trims; empty clears.
+        try store.setCategory(id: id, "  Snippets  ")
+        #expect(try store.fetchAll().first?.category == "Snippets")
+        try store.setCategory(id: id, nil)
+        #expect(try store.fetchAll().first?.category == nil)
+        try store.setCategory(id: id, "   ")
+        #expect(try store.fetchAll().first?.category == nil)
+    }
+
+    @Test func categoryIsEncryptedOnDisk() throws {
+        let store = try makeStore()
+        guard case .inserted(let id) = try store.insert(CaptureInput(plainText: "a clip")) else {
+            Issue.record("expected .inserted"); return
+        }
+        let secretCategory = "ProjectFalcon"
+        try store.setCategory(id: id, secretCategory)
+        let bytes = Data(secretCategory.utf8)
+        for row in try store.rawRows() {
+            let catCipher: Data? = row["cat_cipher"]
+            #expect(catCipher?.range(of: bytes) == nil, "category ciphertext leaks plaintext")
+        }
+    }
+
+    // MARK: - OCR text for images (v4)
+
+    @Test func ocrTextRoundTripsAndIsEncrypted() throws {
+        let store = try makeStore()
+        let payload = Data("png-bytes".utf8)
+        guard case .inserted(let id) = try store.insert(
+            CaptureInput(kind: .image, plainText: "Image 100×100", richData: payload, countOverride: payload.count)
+        ) else {
+            Issue.record("expected .inserted"); return
+        }
+        #expect(try store.fetchAll().first?.ocrText == nil)
+
+        let recognized = "Invoice Total 1234"
+        try store.setOCRText(id: id, recognized)
+        #expect(try store.fetchAll().first?.ocrText == recognized)
+
+        let bytes = Data(recognized.utf8)
+        for row in try store.rawRows() {
+            let ocrCipher: Data? = row["ocr_cipher"]
+            #expect(ocrCipher?.range(of: bytes) == nil, "ocr ciphertext leaks plaintext")
+        }
+
+        try store.setOCRText(id: id, nil)
+        #expect(try store.fetchAll().first?.ocrText == nil)
     }
 }

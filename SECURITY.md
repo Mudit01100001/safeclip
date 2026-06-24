@@ -15,6 +15,7 @@ SafeClip's security promises (and their limits) are spelled out in [TERMS.md](TE
 - Nonce reuse or other cryptographic misuse in `SafeClipCore`
 - The capture pipeline storing content from excluded apps or transient/concealed pasteboards when it shouldn't
 - Bypass of the burn-after-paste deletion or `secure_delete` behaviour
+- The screen-OCR (⌥C) temporary screenshot not being deleted after recognition, the captured image being stored to history, or OCR data leaving the device (it should never — recognition is on-device via Vision)
 
 Out of scope (disclosed limitations, not bugs):
 

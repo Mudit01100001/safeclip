@@ -13,14 +13,16 @@ Every mainstream macOS clipboard manager stores your history as plaintext on dis
 | Plain-text paste by default (⌥↩ keeps formatting) | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Hides history while screen recording | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Pastejacking (ClickFix) warnings | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Screen-region OCR → clipboard (⌥C) | ✅ | ❌ | ❌ | ❌ | ✅ |
 | Zero special permissions at launch | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Open source | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Source-available (MIT) | ✅ | ✅ | ❌ | ❌ | ❌ |
 
 ## How it works
 
-- Press **⌃⇧V** (configurable) — a floating panel opens **at your mouse cursor**, like the emoji picker. Your app keeps focus.
+- Press **⌥V** (configurable) — a floating panel opens **at your mouse cursor**, like the emoji picker. Your app keeps focus.
 - Type to search. **Return** pastes plain text; **⌥Return** keeps the original formatting.
 - SafeClip puts the item on the clipboard — **you press ⌘V**. That one extra keypress is deliberate: simulating ⌘V would require the Accessibility permission (keystroke-injection power). SafeClip launches with **zero special permissions**.
+- Press **⌥C** to grab text off the screen — drag a region like ⌘⇧4 over any non-selectable text (an image, a video frame, a screenshot). SafeClip OCRs it **on-device** (Apple's Vision framework — nothing leaves your Mac), copies the text to your clipboard, and a quick menu-bar pop-up confirms. The screenshot is OCR'd then deleted — never saved to history.
 
 ## Security model — the honest version
 
@@ -49,9 +51,9 @@ Every mainstream macOS clipboard manager stores your history as plaintext on dis
 
 ## Install
 
-**Download:** grab the notarized `.dmg` from [Releases](https://github.com/Mudit01100001/safeclip/releases). On first capture, macOS may show a one-time clipboard-access prompt — choose *Always Allow*.
+**Buy:** the notarized `.dmg` is a paid download from the SafeClip website (coming soon). On first capture, macOS may show a one-time clipboard-access prompt — choose *Always Allow*. The first ⌥C OCR shows a one-time Screen Recording consent — allow it once, then quit & reopen.
 
-**Build from source** (the high-trust path):
+**Build from source** (the high-trust path — free, MIT):
 
 ```bash
 git clone https://github.com/Mudit01100001/safeclip.git

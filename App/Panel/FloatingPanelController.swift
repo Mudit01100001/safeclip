@@ -13,23 +13,49 @@ private final class FloatingPanel: NSPanel {
 /// startup and shown/hidden, so the shortcut→visible path allocates nothing.
 @MainActor
 final class FloatingPanelController: NSObject, NSWindowDelegate {
-    static let panelSize = NSSize(width: 380, height: 442)
+    static let panelWidth: CGFloat = 380
+    /// The body grows up to this when there's room, and shrinks (list scrolls)
+    /// down to `minBodyHeight` so the panel can still open *above* a caret that
+    /// sits high on screen — instead of a fixed-tall panel falling below it.
+    private static let maxBodyHeight: CGFloat = 442
+    private static let minBodyHeight: CGFloat = 240
+    private static let cornerRadius: CGFloat = 18
+    /// Gap between the beak tip and the caret/cursor it points at.
+    private static let anchorGap: CGFloat = 3
 
     private let panel: FloatingPanel
     private let model: PanelViewModel
     private let appState: AppState
+    /// One SwiftUI surface for the whole window (body + beak as one callout).
+    private let hostingView: NSHostingView<ClipboardPanelView>
     private var keyMonitor: Any?
+
+    /// The largest the window ever gets (created at this size, shrunk per show).
+    private static var maxWindowSize: NSSize {
+        NSSize(width: panelWidth, height: maxBodyHeight + PanelArrowSpec.height)
+    }
 
     init(appState: AppState) {
         self.appState = appState
-        self.model = PanelViewModel(appState: appState)
+        let model = PanelViewModel(appState: appState)
+        self.model = model
 
         panel = FloatingPanel(
-            contentRect: NSRect(origin: .zero, size: Self.panelSize),
+            contentRect: NSRect(origin: .zero, size: Self.maxWindowSize),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
             backing: .buffered,
             defer: true
         )
+        // One SwiftUI view paints the whole callout — rounded body + beak — as
+        // a single Liquid Glass (macOS 26+) / material surface, so there's no
+        // seam between body and beak. Geometry is updated per show in layout().
+        hostingView = NSHostingView(
+            rootView: ClipboardPanelView(
+                model: model,
+                arrow: PanelArrowSpec(edge: .bottom, offsetX: Self.panelWidth / 2)
+            )
+        )
+
         super.init()
 
         panel.isFloatingPanel = true
@@ -49,28 +75,14 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
             panel.standardWindowButton(button)?.isHidden = true
         }
 
-        // Liquid Glass chrome on macOS 26+ (NSGlassEffectView refracts the
-        // content behind the panel, Spotlight-style); material fallback below.
-        // The SwiftUI view skips its own background when glass wraps it.
-        if #available(macOS 26.0, *) {
-            let host = NSHostingView(
-                rootView: ClipboardPanelView(model: model, glassChrome: true)
-            )
-            host.frame = NSRect(origin: .zero, size: Self.panelSize)
-            let glass = NSGlassEffectView(frame: NSRect(origin: .zero, size: Self.panelSize))
-            glass.cornerRadius = 18
-            glass.contentView = host
-            panel.contentView = glass
-        } else {
-            let host = NSHostingView(
-                rootView: ClipboardPanelView(model: model, glassChrome: false)
-            )
-            host.frame = NSRect(origin: .zero, size: Self.panelSize)
-            panel.contentView = host
-        }
+        hostingView.autoresizingMask = [.width, .height]
+        panel.contentView = hostingView
 
         model.onRequestPaste = { [weak self] item, optionHeld in
             self?.performPaste(item: item, optionHeld: optionHeld)
+        }
+        model.onRequestPasteCombined = { [weak self] items in
+            self?.performCombinedPaste(items)
         }
     }
 
@@ -80,26 +92,108 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         isVisible ? hide() : show()
     }
 
-    /// Opens at the mouse cursor, clamped to the screen that contains it
-    /// (F2 — including notched and multi-monitor setups).
+    /// Opens above the anchor — the text caret when caret anchoring is enabled
+    /// and granted, otherwise the mouse cursor — with the arrow pointing at it,
+    /// clamped to the screen that contains it (F2 — incl. notch / multi-monitor).
     func show() {
         model.prepareForShow()
-
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
-            ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? NSRect(origin: .zero, size: Self.panelSize)
-
-        var origin = NSPoint(x: mouse.x - 24, y: mouse.y - Self.panelSize.height - 10)
-        if origin.y < visible.minY {
-            origin.y = mouse.y + 10 // no room below the cursor — open above
-        }
-        origin.x = max(visible.minX, min(origin.x, visible.maxX - Self.panelSize.width))
-        origin.y = max(visible.minY, min(origin.y, visible.maxY - Self.panelSize.height))
-
-        panel.setFrame(NSRect(origin: origin, size: Self.panelSize), display: false)
+        layout(for: resolveAnchor())
         panel.makeKeyAndOrderFront(nil)
         installKeyMonitor()
+    }
+
+    /// What the panel points at, in AppKit screen coordinates. `topY`/`bottomY`
+    /// are the visual top and bottom edges of the target (equal for the mouse).
+    private struct Anchor {
+        var x: CGFloat
+        var topY: CGFloat
+        var bottomY: CGFloat
+        var screen: NSScreen?
+    }
+
+    private func resolveAnchor() -> Anchor {
+        // Caret first (opt-in, read-only Accessibility); fall back to the mouse
+        // whenever it's off, not granted, or the field exposes no caret bounds.
+        if appState.settings.caretAnchoring,
+           let caret = CaretLocator.caretRect(assistChromium: appState.settings.assistChromiumApps) {
+            #if DEBUG
+            NSLog("SafeClip panel: anchoring to caret \(caret)")
+            #endif
+            return Anchor(
+                x: caret.midX,
+                topY: caret.maxY,       // AppKit y grows up, so the top edge is maxY
+                bottomY: caret.minY,
+                screen: screen(containing: CGPoint(x: caret.midX, y: caret.midY))
+            )
+        }
+        let mouse = NSEvent.mouseLocation
+        #if DEBUG
+        NSLog("SafeClip panel: anchoring to mouse \(mouse) (caretAnchoring=\(appState.settings.caretAnchoring))")
+        #endif
+        return Anchor(x: mouse.x, topY: mouse.y, bottomY: mouse.y, screen: screen(containing: mouse))
+    }
+
+    private func screen(containing point: CGPoint) -> NSScreen? {
+        NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) } ?? NSScreen.main
+    }
+
+    /// Moves and *sizes* the window so the beak points at `anchor`, preferring
+    /// to sit **above** it (so the panel never covers the field being typed
+    /// into — owner request, 15 June 2026). The body height adapts to the room
+    /// available on the chosen side: a caret high on screen gets a shorter panel
+    /// **above** it (list scrolls) rather than a fixed-tall panel dumped below.
+    private func layout(for anchor: Anchor) {
+        let bodyW = Self.panelWidth
+        let beakH = PanelArrowSpec.height
+        let visible = anchor.screen?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+
+        // Horizontal: centre the body on the anchor, clamped to the screen.
+        let originX = max(visible.minX, min(anchor.x - bodyW / 2, visible.maxX - bodyW))
+
+        // Room for the body (excluding the beak + gap) on each side of the anchor.
+        let availableAbove = visible.maxY - anchor.topY - Self.anchorGap - beakH
+        let availableBelow = anchor.bottomY - Self.anchorGap - beakH - visible.minY
+
+        // Prefer above when it can show a usable panel; else below; else the
+        // roomier side.
+        let placeAbove: Bool
+        if availableAbove >= Self.minBodyHeight {
+            placeAbove = true
+        } else if availableBelow >= Self.minBodyHeight {
+            placeAbove = false
+        } else {
+            placeAbove = availableAbove >= availableBelow
+        }
+
+        let available = max(0, placeAbove ? availableAbove : availableBelow)
+        let bodyH = min(Self.maxBodyHeight, max(Self.minBodyHeight, available))
+        let windowH = bodyH + beakH
+
+        let rawOriginY = placeAbove
+            ? anchor.topY + Self.anchorGap
+            : anchor.bottomY - Self.anchorGap - windowH
+        let originY = max(visible.minY, min(rawOriginY, visible.maxY - windowH))
+
+        // Beak x within the window, aimed at the anchor but kept on the flat
+        // edge between the rounded corners (the shape clamps too, belt + braces).
+        let minBeakX = Self.cornerRadius + PanelArrowSpec.width / 2
+        let maxBeakX = bodyW - Self.cornerRadius - PanelArrowSpec.width / 2
+        let beakX = max(minBeakX, min(anchor.x - originX, maxBeakX))
+
+        hostingView.rootView = ClipboardPanelView(
+            model: model,
+            arrow: PanelArrowSpec(edge: placeAbove ? .bottom : .top, offsetX: beakX)
+        )
+        let frame = NSRect(x: originX, y: originY, width: bodyW, height: windowH)
+        #if DEBUG
+        NSLog("SafeClip panel: placeAbove=\(placeAbove) bodyH=\(bodyH) anchorX=\(anchor.x) top=\(anchor.topY) bottom=\(anchor.bottomY) availAbove=\(availableAbove) availBelow=\(availableBelow) frame=\(frame) visible=\(visible)")
+        #endif
+        // display:false — the panel isn't on screen yet (show() orders it front
+        // after this), so defer the redraw and avoid forcing a layout pass while
+        // the hosting view is already laying out (the layoutSubtree recursion log).
+        panel.setFrame(frame, display: false)
     }
 
     func hide() {
@@ -148,7 +242,11 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
             model.moveSelection(-1)
             return true
         case 36, 76: // return / keypad enter
-            model.pasteSelected(optionHeld: event.modifierFlags.contains(.option))
+            if model.hasMultiSelection {
+                model.pasteMultiSelection() // combined, in click order
+            } else {
+                model.pasteSelected(optionHeld: event.modifierFlags.contains(.option))
+            }
             return true
         case 51 where command: // ⌘⌫ delete item
             model.deleteSelected()
@@ -164,12 +262,28 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
     // MARK: - Paste
 
     private func performPaste(item: ClipItem, optionHeld: Bool) {
+        // While history is hidden (screen recording / Privacy Mode) the list is
+        // blurred and unreadable — don't let a stray Return paste an item the
+        // user can't actually see.
+        guard !appState.historyHidden else { return }
         hide()
         if item.flagReason == .clickfix, !confirmClickFixPaste(item) {
             return
         }
         appState.paste(item, optionHeld: optionHeld)
         // The user presses ⌘V themselves — by design (PRD §8.1).
+    }
+
+    /// Multipaste: places several clips combined for one ⌘V. Warns once if any
+    /// selected item looks like a pastejacking payload.
+    private func performCombinedPaste(_ items: [ClipItem]) {
+        guard !appState.historyHidden else { return }
+        hide()
+        if let flagged = items.first(where: { $0.flagReason == .clickfix }),
+           !confirmClickFixPaste(flagged) {
+            return
+        }
+        appState.pasteCombined(items)
     }
 
     /// F11: flagged items warn before pasting, but never block.

@@ -45,6 +45,35 @@ struct PrivacySettingsView: View {
             }
 
             Section {
+                if appState.settings.ignoreConcealedFrom.isEmpty {
+                    Text("None. Copies marked concealed are masked as passwords.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(appState.settings.ignoreConcealedFrom, id: \.self) { bundleID in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(Self.displayName(for: bundleID))
+                            Text(bundleID).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            appState.resumeConcealing(source: bundleID)
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Button("Add App…") { addUnconcealApp() }
+            } header: {
+                Text("Apps not treated as passwords")
+            } footer: {
+                Text("Some apps tag normal copies as concealed — dictation tools like Wispr Flow paste into the focused app (so it's recorded as the source), and chat apps mark copies too. Listed apps' copies are shown normally instead of masked. You can also right-click any masked item → \u{201C}Always Show Copies from …\u{201D}")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 if appState.settings.exclusionList.isEmpty {
                     Text("No apps excluded — everything is captured (and encrypted).")
                         .foregroundStyle(.secondary)
@@ -90,6 +119,20 @@ struct PrivacySettingsView: View {
             for id in bundleIDs where !settings.exclusionList.contains(id) {
                 settings.exclusionList.append(id)
             }
+        }
+    }
+
+    private func addUnconcealApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose apps whose copies should never be masked as passwords"
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return }
+        let bundleIDs = panel.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }
+        for id in bundleIDs {
+            appState.stopConcealing(source: id) // adds to the list + un-masks existing rows
         }
     }
 

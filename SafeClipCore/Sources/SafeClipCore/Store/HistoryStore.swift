@@ -74,6 +74,22 @@ public final class HistoryStore: Sendable {
                 t.add(column: "thumb_nonce", .blob)
             }
         }
+        // v3: optional user-assigned category, stored encrypted like content
+        // (filtering is done in memory, so encryption costs nothing here).
+        migrator.registerMigration("v3-category") { db in
+            try db.alter(table: "clips") { t in
+                t.add(column: "cat_cipher", .blob)
+                t.add(column: "cat_nonce", .blob)
+            }
+        }
+        // v4: encrypted OCR text for image clips, so images are searchable by
+        // the text inside them. Recognized on-device after capture.
+        migrator.registerMigration("v4-ocr-text") { db in
+            try db.alter(table: "clips") { t in
+                t.add(column: "ocr_cipher", .blob)
+                t.add(column: "ocr_nonce", .blob)
+            }
+        }
         try migrator.migrate(dbQueue)
     }
 
@@ -193,6 +209,73 @@ public final class HistoryStore: Sendable {
         }
     }
 
+    /// Assigns (or, with `nil`, clears) the item's category. The label is
+    /// encrypted on disk; passing an empty/whitespace string clears it.
+    public func setCategory(id: UUID, _ category: String?) throws {
+        let trimmed = category?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let encryptor = self.encryptor
+        try dbQueue.write { db in
+            if let trimmed, !trimmed.isEmpty {
+                let (cipher, nonce) = try encryptor.encrypt(Data(trimmed.utf8))
+                try db.execute(
+                    sql: "UPDATE clips SET cat_cipher = ?, cat_nonce = ? WHERE id = ?",
+                    arguments: [cipher, nonce, id.uuidString]
+                )
+            } else {
+                try db.execute(
+                    sql: "UPDATE clips SET cat_cipher = NULL, cat_nonce = NULL WHERE id = ?",
+                    arguments: [id.uuidString]
+                )
+            }
+        }
+    }
+
+    /// Clears the flag on every row (`is_flagged` → 0, `flag_reason` → NULL).
+    /// Lets the user un-mask items mislabeled by an earlier scan without
+    /// erasing history. Content and pins are untouched.
+    @discardableResult
+    public func resetAllFlags() throws -> Int {
+        try dbQueue.write { db in
+            try db.execute(sql: "UPDATE clips SET is_flagged = 0, flag_reason = NULL")
+            return db.changesCount
+        }
+    }
+
+    /// Clears the concealed flag on every row recorded under `sourceBundle`,
+    /// un-masking copies from an app that over-applies `ConcealedType` (e.g. a
+    /// dictation or chat app). Other flag reasons and other sources untouched.
+    @discardableResult
+    public func unconcealSource(_ sourceBundle: String) throws -> Int {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE clips SET is_flagged = 0, flag_reason = NULL WHERE flag_reason = ? AND source_bundle = ?",
+                arguments: [FlagReason.concealed.rawValue, sourceBundle]
+            )
+            return db.changesCount
+        }
+    }
+
+    /// Stores encrypted OCR text for an image clip (searchable text-in-images).
+    /// No-op style: passing empty/whitespace clears it.
+    public func setOCRText(id: UUID, _ text: String?) throws {
+        let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let encryptor = self.encryptor
+        try dbQueue.write { db in
+            if let trimmed, !trimmed.isEmpty {
+                let (cipher, nonce) = try encryptor.encrypt(Data(trimmed.utf8))
+                try db.execute(
+                    sql: "UPDATE clips SET ocr_cipher = ?, ocr_nonce = ? WHERE id = ?",
+                    arguments: [cipher, nonce, id.uuidString]
+                )
+            } else {
+                try db.execute(
+                    sql: "UPDATE clips SET ocr_cipher = NULL, ocr_nonce = NULL WHERE id = ?",
+                    arguments: [id.uuidString]
+                )
+            }
+        }
+    }
+
     public func markUsed(id: UUID, now: Date = Date()) throws {
         try dbQueue.write { db in
             try db.execute(
@@ -285,6 +368,16 @@ public final class HistoryStore: Sendable {
         if let thumbCipher: Data = row["thumb_cipher"], let thumbNonce: Data = row["thumb_nonce"] {
             thumbnail = try? encryptor.decrypt(ciphertext: thumbCipher, nonce: thumbNonce)
         }
+        var category: String?
+        if let catCipher: Data = row["cat_cipher"], let catNonce: Data = row["cat_nonce"],
+           let catData = try? encryptor.decrypt(ciphertext: catCipher, nonce: catNonce) {
+            category = String(data: catData, encoding: .utf8)
+        }
+        var ocrText: String?
+        if let ocrCipher: Data = row["ocr_cipher"], let ocrNonce: Data = row["ocr_nonce"],
+           let ocrData = try? encryptor.decrypt(ciphertext: ocrCipher, nonce: ocrNonce) {
+            ocrText = String(data: ocrData, encoding: .utf8)
+        }
 
         let createdEpoch: Int64 = row["created_at"]
         let lastUsedEpoch: Int64? = row["last_used_at"]
@@ -304,6 +397,8 @@ public final class HistoryStore: Sendable {
             isBurn: row["is_burn"],
             isFlagged: row["is_flagged"],
             flagReason: reason.flatMap(FlagReason.init(rawValue:)),
+            category: category,
+            ocrText: ocrText,
             createdAt: Date(timeIntervalSince1970: TimeInterval(createdEpoch)),
             lastUsedAt: lastUsedEpoch.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         )

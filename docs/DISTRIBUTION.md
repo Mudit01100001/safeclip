@@ -5,6 +5,17 @@ _One repo, one codebase, two targets. Created Session 4 (June 2026) when the
 project into separate folders per channel — the variants share every source
 file and would silently diverge._
 
+> **Session 5 update — primary channel is a paid website download.** The
+> shipping artifact is the non-sandboxed **`SafeClip`** build (Developer ID,
+> notarized `.dmg`), sold from Mudit's own website behind a payment gateway —
+> **not** offered free on GitHub Releases. The MIT source stays public for the
+> build-from-source / audit path. **`SafeClip-MAS` (App Store) is deferred**
+> until website revenue funds the Apple Developer license; the checklist below
+> stands for when it's revived. Practical consequence: features may rely on
+> non-sandbox capabilities (e.g. screen-region OCR shells out to
+> `screencapture`, forbidden in the sandbox) — that's acceptable while MAS is
+> dormant.
+
 ## The two targets
 
 | | `SafeClip` (GitHub) | `SafeClip-MAS` (App Store) |
@@ -45,6 +56,12 @@ What actually differs:
   (paths-not-contents by design), so capture and paste-back work sandboxed.
   The *receiving* app's own permissions govern whether it can use a pasted
   file URL — same as any sandboxed source app.
+- **Screen-region OCR (⌥C) is GitHub-channel only.** `ScreenOCRService` spawns
+  `/usr/sbin/screencapture`, which the App Sandbox forbids; in a sandboxed
+  build it self-reports `.unavailable` (checks `APP_SANDBOX_CONTAINER_ID`) and
+  shows a toast instead of capturing. If MAS is revived, this needs a
+  ScreenCaptureKit-based reimplementation with a custom selection UI (and the
+  Screen Recording permission), or the feature ships GitHub-only.
 
 ## App Store submission checklist (the parts no script can do)
 

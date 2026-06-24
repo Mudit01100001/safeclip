@@ -16,6 +16,15 @@ import SafeClipCore
 ///    nothing replaced them — the same pattern password managers use
 @MainActor
 final class PasteService {
+    /// Places arbitrary plain text on the pasteboard for one ⌘V — used by
+    /// multipaste, where several clips are combined into a single payload.
+    func placePlainText(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.declareTypes([.string], owner: nil)
+        pasteboard.setString(text, forType: .string)
+        markOwnWrite(pasteboard, sensitive: false)
+    }
+
     func place(item: ClipItem, asRich: Bool, clearAfterSeconds: Int) {
         let pasteboard = NSPasteboard.general
         let sensitive = item.isConcealed || item.isBurn

@@ -130,7 +130,7 @@ All items stored as AES-256-GCM ciphertext. Key generated once at first launch, 
 - ✅ Another user account / another app cannot read the key (verified via `security` CLI).
 
 **F2 — Floating panel at cursor**
-Global, user-configurable shortcut (default `⌃⇧V`) opens an `NSPanel` at `NSEvent.mouseLocation`. Non-activating — does not steal focus from the active app.
+Global, user-configurable shortcut (default `⌥V`) opens an `NSPanel` at `NSEvent.mouseLocation`. Non-activating — does not steal focus from the active app.
 - ✅ Panel appears within 100ms of the shortcut.
 - ✅ Panel position clamps to the visible screen frame (no off-screen / under-notch rendering on multi-monitor).
 - ✅ The active app's text cursor stays active; pressing Escape returns focus untouched.
@@ -193,7 +193,7 @@ Heuristic: clipboard overwritten while a browser is frontmost AND content matche
 
 ### First-launch onboarding (3 screens, skippable)
 1. **Welcome + Terms.** Short plain-language summary of [TERMS.md](TERMS.md) with a "I understand" checkbox (records consent locally — see §17). Links to full terms and source code.
-2. **Set your shortcut.** Default `⌃⇧V` pre-filled; user can rebind. Explains the panel appears at the cursor.
+2. **Set your shortcut.** Default `⌥V` pre-filled; user can rebind. Explains the panel appears at the cursor.
 3. **Privacy posture.** Explains: history is encrypted; nothing leaves the device; the paste-window caveat in one sentence. Optional toggles for screen-record privacy (on) and source-app exclusion (off).
 
 ### The floating panel (primary surface)
@@ -223,7 +223,7 @@ Minimal `NSStatusItem`: Open panel · Clear all history · Pause capture · Pref
 ### Keyboard shortcuts
 | Action | Shortcut |
 |--------|----------|
-| Open panel | `⌃⇧V` (configurable) |
+| Open panel | `⌥V` (configurable) |
 | Paste plain | `Return` |
 | Paste with formatting | `⌥Return` |
 | Move selection | `↑` / `↓` |
@@ -314,7 +314,7 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 
 | Setting | Default | Notes |
 |---------|---------|-------|
-| Global shortcut | `⌃⇧V` | Rebindable via `KeyboardShortcuts` recorder |
+| Global shortcut | `⌥V` | Rebindable via `KeyboardShortcuts` recorder |
 | History limit | 200 items | Or unlimited; oldest pruned beyond limit |
 | Auto-expiry window | 7 days | 1 / 7 / 30 / never |
 | Strip formatting by default | On | Off = default paste keeps formatting |
@@ -375,8 +375,10 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 - ~~**No images / files in history (v1).** Text only. Revisit later.~~ **Revised in v0.2.0 by owner decision (June 2026):** images (encrypted, PNG-normalized, ≤10 MB, with encrypted thumbnails) and file copies (paths stored, files re-referenced on paste) are captured; both toggleable in Settings → General. See ROADMAP R13.
 - **No Windows / Linux.** macOS-only; Keychain + AppKit throughout.
 - **No browser extension.** OS-level monitoring is sufficient.
-- **No AI features.** No summarisation, grouping, or "smart" anything. Scope stays minimal.
+- **No AI features.** No summarisation, grouping, or "smart" anything. Scope stays minimal. (The Session-5 screen-region OCR is **on-device text recognition** via Apple's Vision framework — deterministic OCR, not generative AI, and nothing leaves the device.)
 - **No synthesized keystroke paste.** Deliberate — see §8.
+
+**Added Session 5 — Screen-region OCR (⌥C):** drag a region like ⌘⇧4; the text in it is recognized on-device and copied to the clipboard. The screenshot is OCR'd from a temp file then deleted — never stored in history. Uses interactive `screencapture -i`, so the app needs no Screen Recording permission of its own; non-sandboxed builds only (the App Sandbox forbids spawning the screenshot tool). See ROADMAP R15.
 
 ---
 
@@ -423,7 +425,7 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 
 - **License:** MIT ([LICENSE](LICENSE)). Full source public.
 - **Terms consent:** [TERMS.md](TERMS.md) shown at first launch; "I understand" recorded as a local flag (`hasAcceptedTerms` + version + timestamp in `UserDefaults`). No server, so consent is local-only by design; each release bundles its terms and continued use of a version constitutes acceptance (stated in TERMS §9). README links Terms before any download.
-- **Binaries:** notarized `.dmg` on GitHub Releases. README states binaries are notarized (malware-checked, not an endorsement) and offers a compile-from-source path for high-trust users.
+- **Binaries (revised Session 5):** notarized `.dmg` sold as a **paid download from Mudit's own website** behind a payment gateway — **not** offered free on GitHub Releases. Building from source stays free and is the high-trust path. Binaries are notarized (malware-checked, not an endorsement). **Mac App Store deferred** until website revenue funds the Apple Developer license (see ROADMAP R15 + docs/DISTRIBUTION.md).
 - **Repo hygiene:** README (with the §2 gaps + §3 table as the pitch), SECURITY.md (private advisory process), the PRD, and CLAUDE.md for contributors/agents.
 - **Placeholder:** replace `YOUR_USERNAME` in TERMS.md (×2) when the GitHub repo is created.
 
@@ -449,10 +451,10 @@ CREATE UNIQUE INDEX idx_clips_hash ON clips(content_hash);  -- dedup identical c
 ## 19. Open Questions
 
 - **App name.** "SafeClip" is a working title. Check trademark + macOS app-name collisions before committing. Candidates to weigh: clarity ("Clip"-something signals the category) vs. distinctiveness.
-- **Paid vs. free.** Research supports $8–12 one-time on Releases while fully open source. Decide before M3.
-- **Sandbox stance.** App Sandbox (required for Mac App Store) vs. non-sandboxed (common for menu-bar utilities, simpler pasteboard access). Affects distribution channel. Decide at M0.
-- **macOS 16 launch timing.** Track WWDC 2026; align M3 with GA for the privacy-narrative tailwind.
-- **Images/files in history.** Out of v1 — revisit based on demand.
+- ~~**Paid vs. free.**~~ **Resolved (Session 5):** paid notarized `.dmg` on Mudit's own website via a payment gateway; MIT source stays public for build/audit. Still open: exact price and which payment gateway.
+- ~~**Sandbox stance.**~~ **Resolved:** non-sandboxed build is the shipping artifact; Mac App Store (and its sandbox) deferred until website revenue funds the Apple Developer license.
+- **macOS 16 launch timing.** Track WWDC 2026; align release with GA for the privacy-narrative tailwind.
+- ~~**Images/files in history.**~~ **Shipped in v0.2.0.** Screen-region OCR shipped Session 5.
 
 ---
 

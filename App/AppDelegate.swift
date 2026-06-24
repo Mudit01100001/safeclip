@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var monitor: (any ClipboardMonitoring)?
     private var screenWatcher: ScreenRecordWatcher?
     private var maintenanceTimer: Timer?
+    private var activationObserver: NSObjectProtocol?
 
     static var databaseURL: URL {
         FileManager.default
@@ -48,7 +49,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 3. Root state + surfaces.
-        let state = AppState(store: store, settings: SettingsStore.load())
+        // Safety-led default: enable ClickFix/pastejacking warnings once for
+        // installs created before it became a default (mirrors the shortcut
+        // migration below). Respects a later user opt-out — runs only once.
+        var loadedSettings = SettingsStore.load()
+        if !UserDefaults.standard.bool(forKey: "clickFixDefaultOnMigrated") {
+            loadedSettings.clickFixDetection = true
+            SettingsStore.save(loadedSettings)
+            UserDefaults.standard.set(true, forKey: "clickFixDefaultOnMigrated")
+        }
+        let state = AppState(store: store, settings: loadedSettings)
         appState = state
         panelController = FloatingPanelController(appState: state)
         settingsController = SettingsWindowController(appState: state)
@@ -88,9 +98,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         screenWatcher = watcher
         watcher.start()
 
-        // 6. Global shortcut.
+        // Caret anchoring (opt-in): when on, pre-enable the newly-focused app's
+        // accessibility tree so Chromium/Electron apps expose the caret by the
+        // first ⌥V (the tree builds asynchronously). No-op on native apps and
+        // when the toggle is off. Read-only — see CaretLocator.
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let settings = self?.appState?.settings,
+                      settings.caretAnchoring, settings.assistChromiumApps else { return }
+                CaretLocator.prewarmFrontmostApp()
+            }
+        }
+
+        // 6. Global shortcuts. One-time reset so existing installs pick up the
+        //    v2 defaults (⌥V panel / ⌥C OCR) instead of keeping the old ⌃⇧V.
+        if !UserDefaults.standard.bool(forKey: "shortcutsV2Migrated") {
+            KeyboardShortcuts.reset(.togglePanel, .captureOCR)
+            UserDefaults.standard.set(true, forKey: "shortcutsV2Migrated")
+        }
+
         KeyboardShortcuts.onKeyUp(for: .togglePanel) { [weak self] in
             MainActor.assumeIsolated { self?.panelController?.toggle() }
+        }
+        KeyboardShortcuts.onKeyUp(for: .captureOCR) { [weak self] in
+            MainActor.assumeIsolated { self?.runScreenOCR() }
+        }
+        for (slot, name) in KeyboardShortcuts.Name.quickPaste.enumerated() {
+            KeyboardShortcuts.onKeyUp(for: name) { [weak self] in
+                MainActor.assumeIsolated { self?.quickPaste(slot: slot) }
+            }
         }
 
         // 7. Expiry/limit maintenance — at launch, then hourly (F9).
@@ -127,6 +167,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor?.stop()
         screenWatcher?.stop()
         maintenanceTimer?.invalidate()
+        if let activationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activationObserver)
+        }
+    }
+
+    // MARK: - Quick-paste (⌃⌘1…⌃⌘0)
+
+    /// Places the `slot`-th history item (0-based; matches the panel's order)
+    /// on the clipboard for the user's own ⌘V, confirming with a brief toast.
+    /// Pastejacking-flagged items are *not* placed silently — the user must go
+    /// through the panel, which warns first.
+    private func quickPaste(slot: Int) {
+        guard let state = appState else { return }
+        let clips = state.clips
+        guard clips.indices.contains(slot) else {
+            menuBar?.showToast(
+                symbol: "clipboard",
+                tint: .secondary,
+                title: "Nothing in slot \(slot + 1)",
+                snippet: nil
+            )
+            return
+        }
+        let item = clips[slot]
+        if item.flagReason == .clickfix {
+            menuBar?.showToast(
+                symbol: "exclamationmark.triangle.fill",
+                tint: .red,
+                title: "Flagged item — open the panel to paste",
+                snippet: nil
+            )
+            return
+        }
+        state.paste(item, optionHeld: false)
+        menuBar?.showToast(
+            symbol: "doc.on.clipboard.fill",
+            tint: .accentColor,
+            title: "Copied — press ⌘V",
+            snippet: Self.quickPastePreview(item)
+        )
+    }
+
+    /// One-line, non-sensitive preview for the quick-paste toast.
+    private static func quickPastePreview(_ item: ClipItem) -> String? {
+        if item.isConcealed { return nil } // never surface a concealed value
+        switch item.kind {
+        case .image:
+            return item.plainText // "Image W×H"
+        case .fileList:
+            return item.plainText
+                .split(separator: "\n").first
+                .map { URL(fileURLWithPath: String($0)).lastPathComponent }
+        case .text:
+            return item.plainText
+                .split(separator: "\n", omittingEmptySubsequences: false).first
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+        }
+    }
+
+    // MARK: - Screen OCR (⌥C)
+
+    /// Runs the region-screenshot → OCR → clipboard flow, then confirms via a
+    /// menu-bar toast. The recognized text lands on the clipboard (and is
+    /// captured into history like any copy); the screenshot is never stored.
+    private func runScreenOCR() {
+        Task { @MainActor in
+            switch await ScreenOCRService.capture() {
+            case .copied(let text):
+                let snippet = text
+                    .replacingOccurrences(of: "\n", with: " ")
+                    .trimmingCharacters(in: .whitespaces)
+                menuBar?.showOCRToast(title: "Text copied", snippet: snippet)
+            case .noText:
+                menuBar?.showOCRToast(title: "No text found in selection", snippet: nil)
+            case .cancelled:
+                break // user dismissed the crosshair — stay silent
+            case .unavailable:
+                menuBar?.showOCRToast(
+                    title: "Screen OCR isn't available in this build",
+                    snippet: nil
+                )
+            }
+        }
     }
 
     // MARK: - Failure paths (PRD §12)

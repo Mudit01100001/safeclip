@@ -6,9 +6,13 @@ _Effective date: on first use of the application._
 
 ## 1. What SafeClip is
 
-SafeClip is a free, open-source macOS application that stores a local history of your clipboard contents. All data is stored exclusively on your device. SafeClip has no backend servers, no accounts, no telemetry, and no ability to access or transmit your clipboard data to any third party.
+SafeClip is an open-source (MIT-licensed) macOS application that stores a local history of your clipboard contents. All data is stored exclusively on your device. SafeClip has no backend servers, no accounts, no telemetry, and no ability to access or transmit your clipboard data to any third party.
 
-The source code is publicly available at [github.com/Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip) under the MIT License. You can read, audit, fork, and compile it yourself.
+The source code is publicly available at [github.com/Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip) under the MIT License. You can read, audit, fork, and compile it yourself at no cost. Pre-built, notarized binaries are distributed as a paid download from the SafeClip website; paying for a binary is purely for convenience and support — it grants no additional rights beyond the MIT License (see §6–§7).
+
+SafeClip can also recognize text from a region of your screen on request (the **⌥C** "capture text from screen" shortcut), using Apple's on-device Vision framework. See §3 for what that does with the captured image.
+
+SafeClip can optionally open its panel above the text cursor instead of the mouse pointer. This is **off by default** and requires macOS Accessibility access, which you grant explicitly after an in-app explanation. See §3a for exactly what that access is used for — and what it is never used for.
 
 ---
 
@@ -40,6 +44,19 @@ The history database on disk is AES-256 encrypted. If someone copies the databas
 - **Physical access.** If someone has physical or remote access to your unlocked Mac, clipboard history may be accessible.
 
 - **Pattern detection is opt-in, not infallible.** If you enable pattern detection for sensitive items (API keys, credit cards, etc.), SafeClip uses heuristics that may miss some patterns or produce false positives. Do not rely on pattern detection as your sole protection for sensitive credentials.
+
+- **Screen-region OCR.** When you use the "capture text from screen" shortcut (⌥C), SafeClip invokes the standard macOS screenshot tool to capture the region you select, writes that screenshot to a temporary file, recognizes its text on-device with Apple's Vision framework, copies the recognized text to your clipboard, and then deletes the temporary screenshot. The image itself is not added to your history. Text recognition is performed entirely on your Mac; the screenshot is not transmitted anywhere. The recognized text becomes a normal clipboard item and is therefore captured into your history like any other copy, and is subject to the same paste-window limitation described above.
+
+---
+
+## 3a. Caret anchoring and Accessibility access (optional)
+
+SafeClip works fully with **no special permissions**. One optional convenience — opening the panel directly above your text cursor instead of the mouse pointer ("Open above the text cursor", Settings → General) — requires macOS **Accessibility** access. It is **off by default**, and turning it on shows an in-app explanation before the macOS permission prompt. Here is precisely what that access does:
+
+- **What SafeClip reads:** only the on-screen rectangle of the focused app's text cursor (insertion point), so it can position the panel above it. It uses the read-only Accessibility queries `kAXFocusedUIElement → kAXSelectedTextRange → kAXBoundsForRange`.
+- **What SafeClip never does with it:** it does not read your keystrokes, does not read the text in the field, does not read any other app's content, and never synthesizes input — you always press ⌘V yourself.
+- **Chromium/Electron apps.** Apps built on Chromium/Electron (e.g. Claude for Desktop, Arc) do not expose their cursor position until an assistive client asks them to. With the optional "Also find the cursor in Chromium/Electron apps" sub-setting enabled, SafeClip sets the `AXManualAccessibility` attribute on the focused such app to switch on its accessibility information. **This is the only thing SafeClip writes through the Accessibility API, and it only enables reading the cursor position** — it injects no input and reads no text. You can disable this sub-setting to keep SafeClip strictly read-only and limited to native apps.
+- **Revoking.** You can revoke Accessibility access at any time in System Settings → Privacy & Security → Accessibility; SafeClip then falls back to anchoring the panel at the mouse pointer.
 
 ---
 
@@ -78,10 +95,11 @@ The only requirement is that you include the original copyright notice and licen
 
 ## 7. Pre-built binaries
 
-If you download a pre-built binary from GitHub Releases rather than compiling from source:
+Pre-built binaries are distributed as a paid download from the SafeClip website. Building from source (per §6) remains free and is the highest-trust path. If you use a pre-built binary rather than compiling from source:
 
 - Binaries are notarized with Apple's notarisation service, which checks for known malware. Notarisation is not an endorsement and does not guarantee the absence of all vulnerabilities.
 - You are trusting that the binary matches the source code in this repository. We encourage users with high security requirements to compile from source.
+- Payment is for the convenience of a signed, notarized build and to support development; it does not alter the MIT License terms or create any warranty (see §5).
 
 ---
 

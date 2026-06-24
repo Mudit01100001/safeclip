@@ -73,6 +73,8 @@ struct OnboardingView: View {
                    "Like the emoji picker. Type to search, arrows to choose.")
             bullet("return", "Return pastes plain text",
                    "⌥Return keeps the original formatting. SafeClip puts the item on the clipboard — you press ⌘V. That one extra keypress means SafeClip needs zero special permissions.")
+            bullet("text.cursor", "Optional: anchor to the text caret",
+                   "In Settings you can have the panel open above the blinking text cursor instead of the mouse. That one asks for read-only Accessibility access — to locate the cursor only, never your keystrokes or text — explained in full before macOS prompts you.")
             Spacer()
         }
     }

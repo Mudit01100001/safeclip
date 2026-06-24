@@ -1,6 +1,6 @@
 # SafeClip — App Design & Architecture
 
-_Last updated: June 2026. Status: pre-build (planning complete). Reflects all decisions made in Session 1._
+_Last updated: 15 June 2026 (Session 5). Reflects the built app, incl. screen-region OCR (⌥C) and the ⌥V/⌥C shortcut remap._
 
 ---
 
@@ -43,6 +43,8 @@ SafeClip is **one application bundle**, one process, zero Dock icon. It exposes 
 ```
 
 The three surfaces never open simultaneously (panel and settings are both dismissable; the menu bar is always present but its menu is ephemeral). They communicate exclusively through the shared `AppState` object — no direct references between surface controllers.
+
+There is also one **transient** surface: the **OCR confirmation toast** — a non-activating `NSPanel` shown briefly below the menu-bar icon after a ⌥C screen-region OCR capture (see §4). It owns no state and auto-dismisses.
 
 ---
 
@@ -114,7 +116,7 @@ Icons are PDF/SVG template images so they respect the menu-bar appearance (dark/
 ### Menu structure
 
 ```
-Show History (⌃⇧V)           ← opens the floating panel at cursor
+Show History (⌥V)            ← opens the floating panel at cursor
 ─────────────────────────────
 Pause Capture                ← toggle; "Resume Capture" when paused
 Privacy Mode (Hide History)  ← manual hide for screen shares we can't detect
@@ -145,9 +147,13 @@ one click hides history before a call.
 
 ### What it is
 
-An `NSPanel` that appears **at the mouse cursor** when the user presses the global shortcut (default `⌃⇧V`). It does not steal focus from the active app. The user selects a clip and presses Return; the clip lands on the pasteboard and the panel closes. The user then presses ⌘V in their app as usual.
+An `NSPanel` that appears **at the mouse cursor** when the user presses the global shortcut (default `⌥V`). It does not steal focus from the active app. The user selects a clip and presses Return; the clip lands on the pasteboard and the panel closes. The user then presses ⌘V in their app as usual.
 
 This is the primary use surface — the menu bar is secondary.
+
+### Screen-region OCR (⌥C) and its confirmation toast
+
+A second global shortcut (default `⌥C`) runs `ScreenOCRService`: it launches the native interactive screenshot UI (`/usr/sbin/screencapture -i`, the same crosshair as ⌘⇧4), OCRs the selected region on-device with Vision (`OCRService` → `VNRecognizeTextRequest`), writes the recognized text to `NSPasteboard`, and deletes the temp image — **the screenshot is never stored**. The text then rides the normal clipboard monitor into history like any copy. A small non-activating `NSPanel` toast appears just below the menu-bar icon (`orderFrontRegardless`, auto-dismiss ~1.8s) confirming "Text copied" / "No text found" without stealing focus, so the user can immediately ⌘V where they were. Because the capture is performed by the system screenshot service, SafeClip needs no Screen Recording permission of its own; because it spawns a process, it is unavailable under the App Sandbox (reports `.unavailable`).
 
 ### Panel configuration
 
@@ -350,6 +356,10 @@ Single responsibility: read/write the AES-256 key from the macOS Keychain with `
 
 Polls `CGDisplayStreamCreate` or observes `SCShareableContentInfo` (macOS 15+) to detect active screen recording. Sets `AppState.isRecording`. The floating panel's content view watches this flag and blurs its list content accordingly.
 
+### `OCRService` / `ScreenOCRService`
+
+`OCRService` is a thin async wrapper over Vision's `VNRecognizeTextRequest` (accurate level, language correction, run off the main thread via `Task.detached`). `ScreenOCRService` (`@MainActor`) orchestrates the ⌥C flow: interactive `screencapture` → temp PNG → `OCRService` → `NSPasteboard` → delete temp. It is GitHub-channel only (spawns a process; sandbox-gated by `APP_SANDBOX_CONTAINER_ID`). Neither touches `HistoryStore` directly — the recognized text reaches history through the normal monitor.
+
 ---
 
 ## 7. Data flow end-to-end
@@ -452,7 +462,11 @@ SafeClip/
 │   ├── HistoryStore.swift              ← GRDB wrapper, all DB operations
 │   ├── KeychainManager.swift           ← AES key read/write/generate
 │   ├── EncryptionService.swift         ← AES-256-GCM encrypt/decrypt
-│   └── ScreenRecordWatcher.swift       ← recording detection
+│   ├── ScreenRecordWatcher.swift       ← recording detection
+│   ├── OCRService.swift                ← Vision text recognition (on-device)
+│   └── ScreenOCRService.swift          ← ⌥C: screencapture → OCR → clipboard
+│   (HistoryStore/EncryptionService/KeychainManager actually live in the
+│    SafeClipCore SPM package; listed here for the data-flow picture)
 │
 ├── Models/
 │   ├── ClipItem.swift                  ← value type, encrypted + decrypted forms

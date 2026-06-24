@@ -57,6 +57,11 @@ public struct ClipItem: Identifiable, Sendable, Equatable {
     public var isBurn: Bool
     public var isFlagged: Bool
     public var flagReason: FlagReason?
+    /// Optional user-assigned collection name (encrypted on disk like content).
+    public var category: String?
+    /// Text recognized inside an image clip (encrypted on disk), enabling
+    /// search-within-images. Nil for non-images or until OCR completes.
+    public var ocrText: String?
     public var createdAt: Date
     public var lastUsedAt: Date?
 
@@ -73,6 +78,8 @@ public struct ClipItem: Identifiable, Sendable, Equatable {
         isBurn: Bool = false,
         isFlagged: Bool = false,
         flagReason: FlagReason? = nil,
+        category: String? = nil,
+        ocrText: String? = nil,
         createdAt: Date = Date(),
         lastUsedAt: Date? = nil
     ) {
@@ -88,6 +95,8 @@ public struct ClipItem: Identifiable, Sendable, Equatable {
         self.isBurn = isBurn
         self.isFlagged = isFlagged
         self.flagReason = flagReason
+        self.category = category
+        self.ocrText = ocrText
         self.createdAt = createdAt
         self.lastUsedAt = lastUsedAt
     }

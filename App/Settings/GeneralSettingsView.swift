@@ -1,3 +1,4 @@
+import AppKit
 import KeyboardShortcuts
 import SwiftUI
 
@@ -8,19 +9,66 @@ struct GeneralSettingsView: View {
         Form {
             Section {
                 KeyboardShortcuts.Recorder("Open panel:", name: .togglePanel)
+                KeyboardShortcuts.Recorder("Capture text from screen (OCR):", name: .captureOCR)
+            } header: {
+                Text("Shortcuts")
             } footer: {
-                Text("The panel opens at your cursor, like the emoji picker. SafeClip never simulates ⌘V — you press it yourself, so the app needs no Accessibility permission.")
+                Text("The panel opens at your cursor, like the emoji picker. Capture-text drags a region like ⌘⇧4, reads the text in it, and copies that text to your clipboard — the screenshot is never saved. SafeClip never simulates ⌘V — you press it yourself, so the app needs no Accessibility permission.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                ForEach(Array(KeyboardShortcuts.Name.quickPaste.enumerated()), id: \.offset) { index, name in
+                    KeyboardShortcuts.Recorder("Item \(index + 1):", name: name)
+                }
+            } header: {
+                Text("Quick-paste")
+            } footer: {
+                Text("⌃⌘1–9 and ⌃⌘0 place the top 10 history items on the clipboard for your own ⌘V — without opening the panel. Clear a shortcut to disable that slot.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Open above the text cursor", isOn: caretAnchoringBinding)
+                    .disabled(!CaretLocator.isSupported)
+                Toggle(
+                    "Also find the cursor in Chromium/Electron apps (Claude, Arc, …)",
+                    isOn: appState.settingsBinding(\.assistChromiumApps)
+                )
+                .disabled(!CaretLocator.isSupported || !appState.settings.caretAnchoring)
+                if CaretLocator.isSupported, appState.settings.caretAnchoring, !CaretLocator.isTrusted {
+                    Label(
+                        "Waiting for Accessibility access — grant it to this build in System Settings, then reopen the panel. (Rebuilding the app can reset the grant.)",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    Button("Open Accessibility Settings…") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+            } header: {
+                Text("Panel position")
+            } footer: {
+                Text(caretFooter)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
                 Toggle("Capture images", isOn: appState.settingsBinding(\.captureImages))
+                Toggle("Search text inside images (OCR)", isOn: appState.settingsBinding(\.indexImageText))
+                    .disabled(!appState.settings.captureImages)
+                    .padding(.leading, 16)
                 Toggle("Capture file copies", isOn: appState.settingsBinding(\.captureFiles))
             } header: {
                 Text("What gets captured")
             } footer: {
-                Text("Images are stored encrypted (PNG, up to 10 MB — larger copies are skipped). File copies store the file locations, not the file contents; pasting re-references the original files.")
+                Text("Images are stored encrypted (PNG, up to 10 MB — larger copies are skipped). When enabled, the text inside each copied image is recognized on-device (Apple Vision — nothing leaves your Mac) and stored encrypted so you can search images by their contents. File copies store the file locations, not the file contents; pasting re-references the original files.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -57,5 +105,51 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var caretFooter: String {
+        guard CaretLocator.isSupported else {
+            return "Anchoring to the text cursor isn't available in the App Store build."
+        }
+        return "By default the panel opens just above your mouse pointer. Turn the first option on to have it open above the blinking text cursor instead, with a pointer aimed at it. SafeClip reads only the cursor's on-screen location — never your keystrokes or the text in the field — using macOS Accessibility access (grant once; revoke any time in System Settings → Privacy & Security → Accessibility). The second option covers apps built on Chromium/Electron (Claude, Arc, …), which hide their cursor position until asked: SafeClip switches on that app's accessibility info so the cursor can be located. That's the one thing SafeClip writes via Accessibility, and it only enables reading the cursor — it still never types, pastes, or reads your text. Turn it off to keep strictly to native apps."
+    }
+
+    /// Setting this ON shows an in-app explanation *before* the macOS
+    /// Accessibility prompt (R1); cancelling leaves it off.
+    private var caretAnchoringBinding: Binding<Bool> {
+        Binding(
+            get: { appState.settings.caretAnchoring },
+            set: { wantsOn in
+                if wantsOn {
+                    guard confirmCaretConsent() else { return }
+                    appState.updateSettings { $0.caretAnchoring = true }
+                    CaretLocator.requestTrust()
+                } else {
+                    appState.updateSettings { $0.caretAnchoring = false }
+                }
+            }
+        )
+    }
+
+    private func confirmCaretConsent() -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Let SafeClip anchor the panel to your text cursor?"
+        alert.informativeText = """
+            To open the panel right above where you're typing, SafeClip needs \
+            macOS Accessibility access. It uses that access for one thing only: \
+            to read the on-screen location of the blinking text cursor.
+
+            SafeClip never reads your keystrokes, never reads the text in the \
+            field, and never types or pastes for you — you always press ⌘V \
+            yourself. (For Chromium/Electron apps like Claude it asks the app \
+            to turn on its accessibility info so the cursor can be located — \
+            that only enables reading the cursor's position.) Turn this off \
+            here, or revoke access in System Settings → Privacy & Security → \
+            Accessibility, at any time.
+            """
+        alert.addButton(withTitle: "Continue")
+        alert.addButton(withTitle: "Not Now")
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
     }
 }

@@ -130,15 +130,36 @@ public struct SecurityScanner: Sendable {
         for entry in known where matchesAny([entry.pattern], in: text) {
             return entry.label
         }
-        // Lower confidence: the entire trimmed text is one opaque token.
+        // Lower confidence: the entire trimmed text is one opaque, high-entropy
+        // token. Deliberately strict to avoid flagging ordinary single-token
+        // copies — git SHAs (lowercase hex), UUIDs, URL slugs, and identifiers
+        // were the original false-positive source. A real generic secret
+        // (base64/base62 key material) is ≥40 chars, mixes upper+lower+digit,
+        // and has high per-character entropy; the constraints below require all
+        // three so hex hashes and lowercase slugs no longer match.
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.count >= 32, trimmed.count <= 64,
+        if trimmed.count >= 40, trimmed.count <= 64,
            matchesAny([#"^[A-Za-z0-9_\-]+$"#], in: trimmed),
+           trimmed.rangeOfCharacter(from: .uppercaseLetters) != nil,
+           trimmed.rangeOfCharacter(from: .lowercaseLetters) != nil,
            trimmed.rangeOfCharacter(from: .decimalDigits) != nil,
-           trimmed.rangeOfCharacter(from: .letters) != nil {
+           Self.shannonEntropyPerChar(trimmed) >= 3.2 {
             return "Possible API key or token"
         }
         return nil
+    }
+
+    /// Shannon entropy in bits per character. Random key material approaches
+    /// ~4–6 bits/char; natural-language and repetitive identifiers sit lower.
+    static func shannonEntropyPerChar(_ string: String) -> Double {
+        guard !string.isEmpty else { return 0 }
+        var counts: [Character: Int] = [:]
+        for character in string { counts[character, default: 0] += 1 }
+        let total = Double(string.count)
+        return counts.values.reduce(0.0) { entropy, count in
+            let probability = Double(count) / total
+            return entropy - probability * log2(probability)
+        }
     }
 
     static func containsCardNumber(_ text: String) -> Bool {

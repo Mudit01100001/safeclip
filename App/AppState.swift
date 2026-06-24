@@ -15,14 +15,25 @@ struct AppSettings: Codable, Equatable, Sendable {
     var detectCards: Bool = true
     var detectPrivateKeys: Bool = true
     var autoBurnFlagged: Bool = false
-    var clickFixDetection: Bool = false           // P2 feature, opt-in
+    var clickFixDetection: Bool = true            // safety-led default ON (one-time migration enables it for existing installs)
     var captureConcealed: Bool = true             // Mudit copies passwords and wants them captured
     var maskConcealedPreviews: Bool = true        // …but masked in the panel
     var autoBurnConcealed: Bool = false
+    var ignoreConcealedFrom: [String] = []        // source bundles whose ConcealedType mark we ignore (e.g. dictation/chat apps that over-apply it)
     var captureImages: Bool = true                // v0.2.0 — encrypted, PNG-normalized, ≤10 MB
+    var indexImageText: Bool = true               // OCR copied images on-device so they're searchable
     var captureFiles: Bool = true                 // v0.2.0 — stores paths, not file contents
     var clearClipboardAfterSensitivePaste: Int = 35  // seconds; 0 = off
+    var caretAnchoring: Bool = false              // opt-in: panel above the text caret (read-only AX)
+    var assistChromiumApps: Bool = true           // with caret anchoring: switch on Chromium/Electron a11y so the caret is readable there
+    // Debug builds default OFF so only the build you explicitly launch runs —
+    // a Debug build registering itself as a login item is what resurrected
+    // stale DerivedData bundles during development. Release ships ON.
+    #if DEBUG
+    var launchAtLogin: Bool = false
+    #else
     var launchAtLogin: Bool = true
+    #endif
 }
 
 // Tolerant decoding: fields added in later versions fall back to their
@@ -46,9 +57,13 @@ extension AppSettings {
         captureConcealed = try c.decodeIfPresent(Bool.self, forKey: .captureConcealed) ?? d.captureConcealed
         maskConcealedPreviews = try c.decodeIfPresent(Bool.self, forKey: .maskConcealedPreviews) ?? d.maskConcealedPreviews
         autoBurnConcealed = try c.decodeIfPresent(Bool.self, forKey: .autoBurnConcealed) ?? d.autoBurnConcealed
+        ignoreConcealedFrom = try c.decodeIfPresent([String].self, forKey: .ignoreConcealedFrom) ?? d.ignoreConcealedFrom
         captureImages = try c.decodeIfPresent(Bool.self, forKey: .captureImages) ?? d.captureImages
+        indexImageText = try c.decodeIfPresent(Bool.self, forKey: .indexImageText) ?? d.indexImageText
         captureFiles = try c.decodeIfPresent(Bool.self, forKey: .captureFiles) ?? d.captureFiles
         clearClipboardAfterSensitivePaste = try c.decodeIfPresent(Int.self, forKey: .clearClipboardAfterSensitivePaste) ?? d.clearClipboardAfterSensitivePaste
+        caretAnchoring = try c.decodeIfPresent(Bool.self, forKey: .caretAnchoring) ?? d.caretAnchoring
+        assistChromiumApps = try c.decodeIfPresent(Bool.self, forKey: .assistChromiumApps) ?? d.assistChromiumApps
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? d.launchAtLogin
     }
 }
@@ -162,7 +177,14 @@ final class AppState {
         var flagReason: FlagReason?
         var burn = false
 
-        if capture.isConcealed {
+        // Some apps over-apply ConcealedType (dictation tools like Wispr Flow
+        // paste into the focused app, which then gets recorded as the source;
+        // chat apps mark copies concealed too). The user can opt those sources
+        // out so their copies aren't masked as passwords.
+        let ignoresConcealed = capture.sourceBundle
+            .map { settings.ignoreConcealedFrom.contains($0) } ?? false
+
+        if capture.isConcealed, !ignoresConcealed {
             // Password-manager copies. Honouring the user's decision: captured
             // by default, flagged so the panel masks them, optionally burned.
             guard settings.captureConcealed else { return }
@@ -202,13 +224,33 @@ final class AppState {
             countOverride: capture.countOverride
         )
         do {
-            _ = try store.insert(input)
+            let outcome = try store.insert(input)
             if settings.historyLimit > 0 {
                 try store.enforceLimit(settings.historyLimit)
             }
             reloadHistory()
+            // Index text inside newly-stored images on-device so they're
+            // searchable. Runs after insert so the image appears immediately;
+            // the OCR text fills in shortly after.
+            if case .inserted(let id) = outcome,
+               capture.kind == .image,
+               settings.indexImageText,
+               let imageData = capture.richData {
+                indexImageText(id: id, imageData: imageData)
+            }
         } catch {
             NSLog("SafeClip: capture insert failed: \(error)")
+        }
+    }
+
+    /// On-device OCR of a stored image, written back as encrypted, searchable
+    /// `ocr_text`. Best-effort and silent — failure just leaves it unindexed.
+    private func indexImageText(id: UUID, imageData: Data) {
+        Task { @MainActor [weak self] in
+            guard let text = await OCRService.recognizeText(in: imageData) else { return }
+            guard let self else { return }
+            try? self.store.setOCRText(id: id, text)
+            self.reloadHistory()
         }
     }
 
@@ -240,6 +282,17 @@ final class AppState {
         paste(item, optionHeld: false)
     }
 
+    /// Multipaste: combines several items (in the given order) into one
+    /// plain-text payload on the clipboard for a single ⌘V. Like every paste
+    /// path it never synthesizes ⌘V — the user presses it.
+    func pasteCombined(_ items: [ClipItem], separator: String = "\n") {
+        guard !items.isEmpty else { return }
+        let combined = items.map(\.plainText).joined(separator: separator)
+        pasteService.placePlainText(combined)
+        for item in items { try? store.markUsed(id: item.id) }
+        reloadHistory()
+    }
+
     func deleteItem(_ item: ClipItem) {
         try? store.delete(id: item.id)
         reloadHistory()
@@ -255,9 +308,40 @@ final class AppState {
         reloadHistory()
     }
 
+    /// Assigns or clears an item's category (collection). `nil`/empty clears it.
+    func setCategory(_ item: ClipItem, _ category: String?) {
+        try? store.setCategory(id: item.id, category)
+        reloadHistory()
+    }
+
     func clearAll() {
         try? store.deleteAll() // F6
         reloadHistory()
+    }
+
+    /// Clears flags on all items (un-masks anything an earlier scan mislabeled)
+    /// without deleting history.
+    func resetAllFlags() {
+        _ = try? store.resetAllFlags()
+        reloadHistory()
+    }
+
+    /// Stops treating copies recorded under `bundleID` as concealed: adds the
+    /// app to the ignore list (future copies) and un-masks the existing ones.
+    func stopConcealing(source bundleID: String) {
+        updateSettings { settings in
+            if !settings.ignoreConcealedFrom.contains(bundleID) {
+                settings.ignoreConcealedFrom.append(bundleID)
+            }
+        }
+        _ = try? store.unconcealSource(bundleID)
+        reloadHistory()
+    }
+
+    /// Re-enables concealed masking for `bundleID` (removes it from the ignore
+    /// list). Already-stored rows stay un-masked until copied again.
+    func resumeConcealing(source bundleID: String) {
+        updateSettings { $0.ignoreConcealedFrom.removeAll { $0 == bundleID } }
     }
 
     /// Expiry sweep + history-limit enforcement; runs at launch and hourly.

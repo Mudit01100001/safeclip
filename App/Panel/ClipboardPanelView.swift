@@ -1,3 +1,4 @@
+import AppKit
 import SafeClipCore
 import SwiftUI
 
@@ -5,30 +6,42 @@ import SwiftUI
 /// search field → list → ClickFix warning (when relevant) → hint bar.
 struct ClipboardPanelView: View {
     @Bindable var model: PanelViewModel
-    /// True when an NSGlassEffectView provides the chrome (macOS 26+) —
-    /// the view then draws no background of its own.
-    var glassChrome = false
+    /// Where the callout beak points (set per-show by the controller).
+    var arrow: PanelArrowSpec
     @FocusState private var searchFocused: Bool
 
     var body: some View {
+        let shape = CalloutShape(arrow: arrow)
         VStack(spacing: 0) {
             searchField
             Divider()
+            if !model.categories.isEmpty {
+                categoryBar
+                Divider()
+            }
             content
             if let selected = model.selectedItem, selected.flagReason == .clickfix {
                 clickFixWarning
             }
+            if model.hasMultiSelection {
+                multiSelectionBar
+            }
             Divider()
             HintBarView(stripByDefault: model.stripByDefault)
         }
-        .frame(width: FloatingPanelController.panelSize.width,
-               height: FloatingPanelController.panelSize.height)
+        // Reserve the beak strip on the arrow edge, then fill whatever size the
+        // window currently is (the controller sizes it per show). The shaped
+        // background fills the beak strip so body + beak read as one surface.
+        .padding(arrow.edge == .bottom ? .bottom : .top, PanelArrowSpec.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            if !glassChrome {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.regularMaterial)
+            if #available(macOS 26.0, *) {
+                Color.clear.glassEffect(.regular, in: shape)
+            } else {
+                shape.fill(.regularMaterial)
             }
         }
+        .clipShape(shape)
         .onChange(of: model.focusEpoch, initial: true) {
             searchFocused = true
         }
@@ -49,14 +62,73 @@ struct ClipboardPanelView: View {
         .padding(.vertical, 10)
     }
 
+    private var categoryBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                categoryChip(title: "All", isSelected: model.selectedCategory == nil) {
+                    model.selectCategory(nil)
+                }
+                ForEach(model.categories, id: \.self) { category in
+                    categoryChip(
+                        title: category,
+                        isSelected: model.selectedCategory == category
+                    ) {
+                        model.selectCategory(model.selectedCategory == category ? nil : category)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        }
+    }
+
+    private func categoryChip(
+        title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(
+                    isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                    in: Capsule()
+                )
+                .foregroundStyle(isSelected ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+        }
+        .buttonStyle(.plain)
+    }
+
     @ViewBuilder
     private var content: some View {
         if model.historyHidden {
-            PanelPlaceholderView(
-                symbol: "eye.slash",
-                title: "Hidden while screen recording",
-                caption: "History reappears when recording or Privacy Mode ends."
-            )
+            if model.filtered.isEmpty {
+                PanelPlaceholderView(
+                    symbol: "eye.slash",
+                    title: "Hidden while screen recording",
+                    caption: "History reappears when recording or Privacy Mode ends."
+                )
+            } else {
+                // Blur, don't blank: keep the shape of the list so the panel
+                // still reads as itself on a screen share, but no content is
+                // legible. Interaction is off so nothing can be pasted blind.
+                listView
+                    .blur(radius: 10)
+                    .allowsHitTesting(false)
+                    .overlay(alignment: .bottom) {
+                        Label(
+                            "Hidden while screen recording",
+                            systemImage: "eye.slash"
+                        )
+                        .font(.caption)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 12)
+                    }
+            }
         } else if model.filtered.isEmpty {
             PanelPlaceholderView(
                 symbol: "doc.on.clipboard",
@@ -78,12 +150,19 @@ struct ClipboardPanelView: View {
                         ClipRowView(
                             item: item,
                             isSelected: index == model.selectedIndex,
-                            masked: item.isConcealed && model.maskConcealed
+                            masked: item.isConcealed && model.maskConcealed,
+                            multiOrder: model.multiOrder(of: item)
                         )
                         .id(item.id)
                         .onTapGesture {
-                            model.select(index)
-                            model.paste(item, optionHeld: false)
+                            // ⌘-click builds an ordered multipaste set; a plain
+                            // click pastes that one item immediately.
+                            if NSEvent.modifierFlags.contains(.command) {
+                                model.toggleMultiSelect(item)
+                            } else {
+                                model.select(index)
+                                model.paste(item, optionHeld: false)
+                            }
                         }
                         .contextMenu { contextMenu(for: item) }
                     }
@@ -105,8 +184,89 @@ struct ClipboardPanelView: View {
             model.toggleBurn(item)
         }
         Button("Copy Again") { model.copyAgain(item) }
+        categoryMenu(for: item)
+        if item.isConcealed, let source = item.sourceBundle {
+            Button("Always Show Copies from \(Self.appName(for: source))") {
+                model.stopConcealing(source: source)
+            }
+        }
         Divider()
         Button("Delete", role: .destructive) { model.delete(item) }
+    }
+
+    @ViewBuilder
+    private func categoryMenu(for item: ClipItem) -> some View {
+        Menu("Category") {
+            Button {
+                promptNewCategory(for: item)
+            } label: {
+                Label("New Category…", systemImage: "plus")
+            }
+            if !model.categories.isEmpty {
+                Divider()
+                ForEach(model.categories, id: \.self) { category in
+                    Button {
+                        model.setCategory(item, item.category == category ? nil : category)
+                    } label: {
+                        if item.category == category {
+                            Label(category, systemImage: "checkmark")
+                        } else {
+                            Text(category)
+                        }
+                    }
+                }
+            }
+            if item.category != nil {
+                Divider()
+                Button("Remove from Category") { model.setCategory(item, nil) }
+            }
+        }
+    }
+
+    /// Prompts for a new collection name. Showing the alert dismisses the panel
+    /// (it resigns key); the captured `item` keeps the assignment correct.
+    private func promptNewCategory(for item: ClipItem) {
+        let alert = NSAlert()
+        alert.messageText = "New Category"
+        alert.informativeText = "Name a collection for this item."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
+        field.placeholderString = "e.g. Work, Snippets"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            model.setCategory(item, field.stringValue)
+        }
+    }
+
+    /// Friendly name for a source bundle ID, falling back to the ID itself.
+    static func appName(for bundleID: String) -> String {
+        guard
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID),
+            let name = Bundle(url: url)?.infoDictionary?["CFBundleName"] as? String
+        else { return bundleID }
+        return name
+    }
+
+    private var multiSelectionBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checklist")
+            Text("\(model.multiSelection.count) selected")
+                .fontWeight(.medium)
+            Text("· ⌘-click to add · ↩ paste in order")
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+            Button("Clear") { model.clearMultiSelection() }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.tint.opacity(0.12))
     }
 
     private var clickFixWarning: some View {
@@ -127,11 +287,33 @@ struct ClipRowView: View {
     let item: ClipItem
     let isSelected: Bool
     let masked: Bool
+    /// 1-based position in the multipaste selection, or nil when not selected.
+    var multiOrder: Int? = nil
+    /// Concealed rows mask their preview at rest but reveal while hovered, so
+    /// the list stays unreadable at a glance yet any item can be checked on
+    /// demand. (Many apps over-apply `org.nspasteboard.ConcealedType` — e.g.
+    /// Claude, WhatsApp — so this isn't only real passwords.)
+    @State private var hovering = false
+
+    private var isMasked: Bool { masked && !hovering }
 
     var body: some View {
         HStack(spacing: 8) {
             leadingBadge
                 .frame(width: 14)
+            if let swatch {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color(
+                        .sRGB,
+                        red: swatch.red, green: swatch.green, blue: swatch.blue,
+                        opacity: swatch.alpha
+                    ))
+                    .frame(width: 24, height: 24)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .strokeBorder(.separator, lineWidth: 0.5)
+                    )
+            }
             if let thumbnail {
                 Image(nsImage: thumbnail)
                     .resizable()
@@ -140,10 +322,17 @@ struct ClipRowView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
             Text(displayText)
-                .font(.system(.body, design: masked ? .monospaced : .default))
+                .font(.system(.body, design: isMasked ? .monospaced : .default))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 8)
+            if let multiOrder {
+                Text("\(multiOrder)")
+                    .font(.caption2.bold())
+                    .foregroundStyle(Color.white)
+                    .frame(width: 16, height: 16)
+                    .background(Color.accentColor, in: Circle())
+            }
             Text(trailingDetail)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -151,21 +340,36 @@ struct ClipRowView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(
-            isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.22)) : AnyShapeStyle(.clear),
-            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-        )
+        .background(rowBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .help(helpText)
     }
 
+    private var rowBackground: AnyShapeStyle {
+        if isSelected { return AnyShapeStyle(Color.accentColor.opacity(0.22)) }
+        if multiOrder != nil { return AnyShapeStyle(Color.accentColor.opacity(0.12)) }
+        return AnyShapeStyle(.clear)
+    }
+
     private var thumbnail: NSImage? {
-        guard item.kind == .image, !masked, let data = item.thumbnailData else { return nil }
+        guard item.kind == .image, !isMasked, let data = item.thumbnailData else { return nil }
         return NSImage(data: data)
     }
 
+    /// A swatch is shown when the whole clip is a single CSS color (designer
+    /// workflow). Masked rows never resolve a swatch.
+    private var swatch: ClipColor? {
+        guard item.kind == .text, !isMasked else { return nil }
+        return ClipColor.parse(item.plainText)
+    }
+
+    private var isSVG: Bool {
+        item.kind == .text && !isMasked && isLikelySVGMarkup(item.plainText)
+    }
+
     private var displayText: String {
-        if masked { return "••••••••••••" }
+        if isMasked { return "••••••••••••" }
         switch item.kind {
         case .image:
             return item.plainText // "Image W×H" placeholder
@@ -203,6 +407,9 @@ struct ClipRowView: View {
             Image(systemName: "photo").font(.caption).foregroundStyle(.secondary)
         } else if item.kind == .fileList {
             Image(systemName: "doc.on.doc").font(.caption).foregroundStyle(.secondary)
+        } else if isSVG {
+            Image(systemName: "chevron.left.forwardslash.chevron.right")
+                .font(.caption).foregroundStyle(.purple)
         }
     }
 
@@ -234,7 +441,7 @@ struct ClipRowView: View {
                 "Deleted from history after one paste. Content is briefly readable by other apps during the paste itself (see Terms §3)."
             )
         }
-        if masked { lines.append("Preview hidden — press Return to paste.") }
+        if masked { lines.append("Preview hidden — hover to reveal, or press Return to paste.") }
         return lines.joined(separator: "\n")
     }
 

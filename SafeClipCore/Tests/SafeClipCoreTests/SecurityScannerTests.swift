@@ -89,14 +89,45 @@ struct SecurityScannerTests {
         #expect(result.detail == "AWS access key")
     }
 
-    @Test func opaqueTokenIsFlaggedLowConfidence() {
+    @Test func highEntropyMixedCaseTokenIsFlaggedLowConfidence() {
+        // ≥40 chars, mixes upper+lower+digit, high entropy — real key material.
         let result = scanner.scan(
-            text: "f3a9c1d44e0b48aa9c021f7b9d8e5a6b",
+            text: "aB3xY7zQ9mK2pL5nR8sT1vW4uC6dF0gHjE2iO5kP9qZ",
             sourceBundle: terminal,
             options: .allOn
         )
         #expect(result.flagReason == .apiKey)
         #expect(result.detail == "Possible API key or token")
+    }
+
+    @Test func lowercaseHexHashIsNotFlagged() {
+        // Regression: a 32-char lowercase hex hash (git blob/MD5-style) is a
+        // common ordinary copy and must NOT be mistaken for a secret.
+        let result = scanner.scan(
+            text: "f3a9c1d44e0b48aa9c021f7b9d8e5a6b",
+            sourceBundle: terminal,
+            options: .allOn
+        )
+        #expect(result == .clean)
+    }
+
+    @Test func gitCommitShaIsNotFlagged() {
+        // 40-char lowercase hex — no uppercase, so it fails the new constraints.
+        let result = scanner.scan(
+            text: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b",
+            sourceBundle: terminal,
+            options: .allOn
+        )
+        #expect(result == .clean)
+    }
+
+    @Test func uuidIsNotFlagged() {
+        let result = scanner.scan(
+            text: "550e8400-e29b-41d4-a716-446655440000",
+            sourceBundle: terminal,
+            options: .allOn
+        )
+        #expect(result == .clean)
     }
 
     @Test func luhnValidCardIsFlagged() {

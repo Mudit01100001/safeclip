@@ -68,7 +68,21 @@ final class PollingClipboardMonitor: ClipboardMonitoring {
         if typeNames.contains(PasteboardConvention.transient) { return }
 
         let concealed = typeNames.contains(PasteboardConvention.concealed)
-        let source = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        // Prefer the nspasteboard.org "source" convention (the app that actually
+        // wrote the content) over the frontmost app — so a dictation tool like
+        // Wispr Flow that pastes into another app is attributed to Wispr, not to
+        // whatever happened to be focused (Claude/WhatsApp).
+        let conventionSource = pasteboard.string(forType: .init(PasteboardConvention.source))
+        let source = (conventionSource?.isEmpty == false ? conventionSource : nil)
+            ?? NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+
+        #if DEBUG
+        NSLog("SafeClip capture: frontmost=%@ source(convention)=%@ concealed=%@ types=%@",
+              NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?",
+              conventionSource ?? "(none)",
+              concealed ? "YES" : "no",
+              typeNames.sorted().joined(separator: ","))
+        #endif
 
         // 1) File copies — checked before text because Finder also puts the
         //    file *name* on the pasteboard as a plain string.

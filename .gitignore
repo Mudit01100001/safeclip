@@ -17,3 +17,6 @@ Package.resolved.lock
 # Release artifacts
 dist/
 *.dmg
+
+# Local tooling / agent config
+.claude/

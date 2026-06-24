@@ -26,5 +26,20 @@ final class SettingsWindowController: NSWindowController {
         window?.makeKeyAndOrderFront(nil)
         // Explicit user intent ("Settings…" clicked) justifies activation.
         NSApp.activate(ignoringOtherApps: true)
+        // SwiftUI grouped Forms default to legacy (always-on) scrollers; flip
+        // every scroll view in the window to overlay so the bar auto-hides.
+        if let content = window?.contentView {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                Self.applyOverlayScrollers(in: content)
+            }
+        }
+    }
+
+    private static func applyOverlayScrollers(in view: NSView) {
+        if let scrollView = view as? NSScrollView {
+            scrollView.scrollerStyle = .overlay
+            scrollView.autohidesScrollers = true
+        }
+        for subview in view.subviews { applyOverlayScrollers(in: subview) }
     }
 }

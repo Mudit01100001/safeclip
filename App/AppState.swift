@@ -2,6 +2,32 @@ import AppKit
 import SafeClipCore
 import SwiftUI
 
+/// The shared modifier applied to every numeric quick-paste slot, so the user
+/// can re-base all ten at once instead of rebinding each.
+enum QuickPasteModifier: String, Codable, CaseIterable, Identifiable, Sendable {
+    case controlCommand, optionCommand, controlOption, shiftCommand
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .controlCommand: "⌃⌘  Control-Command"
+        case .optionCommand: "⌥⌘  Option-Command"
+        case .controlOption: "⌃⌥  Control-Option"
+        case .shiftCommand: "⇧⌘  Shift-Command"
+        }
+    }
+
+    var flags: NSEvent.ModifierFlags {
+        switch self {
+        case .controlCommand: [.control, .command]
+        case .optionCommand: [.option, .command]
+        case .controlOption: [.control, .option]
+        case .shiftCommand: [.shift, .command]
+        }
+    }
+}
+
 /// All persisted preferences (PRD §10). Defaults follow the closed decisions
 /// in CLAUDE.md: capture-everything by default, detection opt-in.
 struct AppSettings: Codable, Equatable, Sendable {
@@ -26,6 +52,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var clearClipboardAfterSensitivePaste: Int = 35  // seconds; 0 = off
     var caretAnchoring: Bool = false              // opt-in: panel above the text caret (read-only AX)
     var assistChromiumApps: Bool = true           // with caret anchoring: switch on Chromium/Electron a11y so the caret is readable there
+    var caretProximityPoints: Double = 500        // anchor to the caret only within this many points of the pointer; else use the pointer
+    var quickPasteModifier: QuickPasteModifier = .controlCommand  // base modifier for ⌃⌘1…0 quick-paste slots
     // Debug builds default OFF so only the build you explicitly launch runs —
     // a Debug build registering itself as a login item is what resurrected
     // stale DerivedData bundles during development. Release ships ON.
@@ -64,6 +92,8 @@ extension AppSettings {
         clearClipboardAfterSensitivePaste = try c.decodeIfPresent(Int.self, forKey: .clearClipboardAfterSensitivePaste) ?? d.clearClipboardAfterSensitivePaste
         caretAnchoring = try c.decodeIfPresent(Bool.self, forKey: .caretAnchoring) ?? d.caretAnchoring
         assistChromiumApps = try c.decodeIfPresent(Bool.self, forKey: .assistChromiumApps) ?? d.assistChromiumApps
+        caretProximityPoints = try c.decodeIfPresent(Double.self, forKey: .caretProximityPoints) ?? d.caretProximityPoints
+        quickPasteModifier = try c.decodeIfPresent(QuickPasteModifier.self, forKey: .quickPasteModifier) ?? d.quickPasteModifier
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? d.launchAtLogin
     }
 }
@@ -183,16 +213,14 @@ final class AppState {
         // out so their copies aren't masked as passwords.
         let ignoresConcealed = capture.sourceBundle
             .map { settings.ignoreConcealedFrom.contains($0) } ?? false
+        let isConcealed = capture.isConcealed && !ignoresConcealed
 
-        if capture.isConcealed, !ignoresConcealed {
-            // Password-manager copies. Honouring the user's decision: captured
-            // by default, flagged so the panel masks them, optionally burned.
-            guard settings.captureConcealed else { return }
-            flagReason = .concealed
-            burn = settings.autoBurnConcealed
-        } else if capture.kind == .text {
-            // Pattern/ClickFix scanning is text-only — image bytes and file
-            // paths aren't shell commands or credentials.
+        // Scan text FIRST so an active pastejacking threat is recognised even
+        // when the source app marked the copy concealed — a shell command
+        // copied from a browser address bar is tagged ConcealedType by Safari,
+        // and ClickFix must outrank password-masking. (Pattern/ClickFix
+        // scanning is text-only; image bytes and file paths aren't commands.)
+        if capture.kind == .text {
             let options = SecurityScanner.Options(
                 detectClickFix: settings.clickFixDetection,
                 detectAPIKeys: settings.patternDetectionEnabled && settings.detectAPIKeys,
@@ -210,6 +238,16 @@ final class AppState {
             if let reason = flagReason, reason != .clickfix, settings.autoBurnFlagged {
                 burn = true
             }
+        }
+
+        // Concealed (password-manager) content: mask it — unless the scan
+        // already found a more urgent pastejacking flag, which stays visible.
+        if isConcealed, flagReason != .clickfix {
+            // Honouring the user's decision: captured by default, flagged so
+            // the panel masks it, optionally burned.
+            guard settings.captureConcealed else { return }
+            flagReason = .concealed
+            burn = settings.autoBurnConcealed
         }
 
         let input = CaptureInput(
@@ -247,8 +285,11 @@ final class AppState {
     /// `ocr_text`. Best-effort and silent — failure just leaves it unindexed.
     private func indexImageText(id: UUID, imageData: Data) {
         Task { @MainActor [weak self] in
-            guard let text = await OCRService.recognizeText(in: imageData) else { return }
-            guard let self else { return }
+            let text = await OCRService.recognizeText(in: imageData)
+            #if DEBUG
+            NSLog("SafeClip OCR-index: image \(imageData.count) bytes → \(text?.count ?? -1) chars recognized")
+            #endif
+            guard let text, let self else { return }
             try? self.store.setOCRText(id: id, text)
             self.reloadHistory()
         }
@@ -291,6 +332,35 @@ final class AppState {
         pasteService.placePlainText(combined)
         for item in items { try? store.markUsed(id: item.id) }
         reloadHistory()
+    }
+
+    /// Adds a hex color picked with the eyedropper to history and places it on
+    /// the clipboard for ⌘V. Attributed to SafeClip; renders as a swatch.
+    func addColorPick(_ hex: String) {
+        let input = CaptureInput(
+            kind: .text,
+            plainText: hex,
+            sourceBundle: Bundle.main.bundleIdentifier
+        )
+        _ = try? store.insert(input)
+        pasteService.placePlainText(hex) // marked as our write, so the monitor skips it
+        reloadHistory()
+    }
+
+    /// Copies the text recognized inside an image clip to the clipboard. Runs
+    /// OCR on demand (and caches it) when the image hasn't been indexed yet.
+    func copyImageText(_ item: ClipItem) {
+        if let text = item.ocrText, !text.isEmpty {
+            pasteService.placePlainText(text)
+            return
+        }
+        guard item.kind == .image, let data = item.richData else { return }
+        Task { @MainActor [weak self] in
+            guard let text = await OCRService.recognizeText(in: data), let self else { return }
+            try? self.store.setOCRText(id: item.id, text)
+            self.pasteService.placePlainText(text)
+            self.reloadHistory()
+        }
     }
 
     func deleteItem(_ item: ClipItem) {

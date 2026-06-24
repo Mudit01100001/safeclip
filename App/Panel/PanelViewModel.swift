@@ -12,6 +12,9 @@ final class PanelViewModel {
     /// When set, only items in this category are shown (nil = all).
     var selectedCategory: String?
     private(set) var filtered: [ClipItem] = []
+    /// Index in `filtered` where image-only (matched via OCR) results begin —
+    /// the view draws an "Appeared in images" header there. nil when none.
+    private(set) var imageSectionStart: Int?
     private(set) var selectedIndex = 0
     /// Bumped each time the panel shows so the view refocuses the search field.
     private(set) var focusEpoch = 0
@@ -93,17 +96,25 @@ final class PanelViewModel {
     }
 
     func recomputeFilter() {
-        var result = appState.clips
+        var base = appState.clips
         if let selectedCategory {
-            result = result.filter { $0.category == selectedCategory }
+            base = base.filter { $0.category == selectedCategory }
         }
-        if !searchText.isEmpty {
-            result = result.filter { clip in
-                clip.plainText.localizedCaseInsensitiveContains(searchText)
-                    || (clip.ocrText?.localizedCaseInsensitiveContains(searchText) ?? false)
+        if searchText.isEmpty {
+            filtered = base
+            imageSectionStart = nil
+        } else {
+            let query = searchText
+            // Image clips that match only via their OCR text go into an
+            // "Appeared in images" group shown at the TOP, then direct matches.
+            let direct = base.filter { $0.plainText.localizedCaseInsensitiveContains(query) }
+            let imageOnly = base.filter { clip in
+                !clip.plainText.localizedCaseInsensitiveContains(query)
+                    && (clip.ocrText?.localizedCaseInsensitiveContains(query) ?? false)
             }
+            filtered = imageOnly + direct
+            imageSectionStart = imageOnly.isEmpty ? nil : 0
         }
-        filtered = result
         selectedIndex = filtered.isEmpty ? 0 : min(selectedIndex, filtered.count - 1)
     }
 
@@ -165,6 +176,10 @@ final class PanelViewModel {
     func copyAgain(_ item: ClipItem) {
         appState.copyAgain(item)
         recomputeFilter()
+    }
+
+    func copyImageText(_ item: ClipItem) {
+        appState.copyImageText(item)
     }
 
     func stopConcealing(source: String) {

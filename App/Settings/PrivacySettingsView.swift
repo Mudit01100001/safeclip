@@ -13,9 +13,7 @@ struct PrivacySettingsView: View {
                     isOn: appState.settingsBinding(\.screenRecordingPrivacy)
                 )
             } footer: {
-                Text("Detects the macOS capture UI automatically. App-based sharing (Zoom, Meet) can't be detected without extra permissions — use Privacy Mode in the menu bar before a call.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ExpandableText(text: "Detects the macOS capture UI automatically and blurs the history. App-based sharing (Zoom, Meet) can't be detected without extra permissions, so use Privacy Mode in the menu bar before a call. Separately, the floating panel and menu-bar pop-ups are always excluded from screenshots and screen recordings at the window level, so clipboard contents can't be captured.")
             }
 
             Section {
@@ -39,9 +37,7 @@ struct PrivacySettingsView: View {
             } header: {
                 Text("Passwords")
             } footer: {
-                Text("Password managers mark copies as concealed (org.nspasteboard.ConcealedType). SafeClip stores them encrypted like everything else, masks their preview, and can wipe the system clipboard afterwards — the same safety net password managers use.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ExpandableText(text: "Password managers mark copies as concealed (org.nspasteboard.ConcealedType). SafeClip stores them encrypted like everything else, masks their preview, and can wipe the system clipboard afterwards, the same safety net password managers use.")
             }
 
             Section {
@@ -68,14 +64,12 @@ struct PrivacySettingsView: View {
             } header: {
                 Text("Apps not treated as passwords")
             } footer: {
-                Text("Some apps tag normal copies as concealed — dictation tools like Wispr Flow paste into the focused app (so it's recorded as the source), and chat apps mark copies too. Listed apps' copies are shown normally instead of masked. You can also right-click any masked item → \u{201C}Always Show Copies from …\u{201D}")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ExpandableText(text: "Some apps tag normal copies as concealed: dictation tools like Wispr Flow paste into the focused app (so it's recorded as the source), and chat apps mark copies too. Listed apps' copies are shown normally instead of masked. You can also right-click any masked item → \u{201C}Always Show Copies from …\u{201D}")
             }
 
             Section {
                 if appState.settings.exclusionList.isEmpty {
-                    Text("No apps excluded — everything is captured (and encrypted).")
+                    Text("No apps excluded. Everything is captured (and encrypted).")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(appState.settings.exclusionList, id: \.self) { bundleID in
@@ -97,9 +91,7 @@ struct PrivacySettingsView: View {
             } header: {
                 Text("Excluded apps")
             } footer: {
-                Text("Copies made in excluded apps are never stored at all. Off by default so password copies are captured — exclude your password manager here if you'd rather they never land in history.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ExpandableText(text: "Copies made in excluded apps are never stored at all. Off by default so password copies are captured. Exclude your password manager here if you'd rather they never land in history.")
             }
         }
         .formStyle(.grouped)

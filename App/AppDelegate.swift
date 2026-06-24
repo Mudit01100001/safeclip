@@ -58,6 +58,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SettingsStore.save(loadedSettings)
             UserDefaults.standard.set(true, forKey: "clickFixDefaultOnMigrated")
         }
+        // The caret-proximity threshold first shipped too high to ever trigger
+        // the pointer fallback on one screen; reset it once to a working value.
+        if !UserDefaults.standard.bool(forKey: "caretProximityResetMigrated") {
+            loadedSettings.caretProximityPoints = 500
+            SettingsStore.save(loadedSettings)
+            UserDefaults.standard.set(true, forKey: "caretProximityResetMigrated")
+        }
         let state = AppState(store: store, settings: loadedSettings)
         appState = state
         panelController = FloatingPanelController(appState: state)
@@ -66,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             appState: state,
             actions: .init(
                 showPanel: { [weak self] in self?.panelController?.toggle() },
+                pickColor: { [weak self] in self?.pickColor() },
                 openSettings: { [weak self] in self?.settingsController?.open() },
                 clearAll: { [weak state] in state?.clearAll() },
                 quit: { NSApp.terminate(nil) }
@@ -132,6 +140,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 MainActor.assumeIsolated { self?.quickPaste(slot: slot) }
             }
         }
+        KeyboardShortcuts.onKeyUp(for: .pickColor) { [weak self] in
+            MainActor.assumeIsolated { self?.pickColor() }
+        }
 
         // 7. Expiry/limit maintenance — at launch, then hourly (F9).
         state.runMaintenance()
@@ -195,7 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuBar?.showToast(
                 symbol: "exclamationmark.triangle.fill",
                 tint: .red,
-                title: "Flagged item — open the panel to paste",
+                title: "Flagged item. Open the panel to paste",
                 snippet: nil
             )
             return
@@ -204,7 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar?.showToast(
             symbol: "doc.on.clipboard.fill",
             tint: .accentColor,
-            title: "Copied — press ⌘V",
+            title: "Copied. Press ⌘V",
             snippet: Self.quickPastePreview(item)
         )
     }
@@ -224,6 +235,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .split(separator: "\n", omittingEmptySubsequences: false).first
                 .map { $0.trimmingCharacters(in: .whitespaces) }
         }
+    }
+
+    // MARK: - Eyedropper (⌥P)
+
+    /// Picks a color and copies its hex into history. Uses the system sampler
+    /// for now; the custom magnifier eyedropper (ScreenColorPicker) is WIP —
+    /// its overlay locked window-switching, so it's disabled until the
+    /// magnifier version with the owner's icon lands (see ROADMAP / memory).
+    private func pickColor() {
+        NSColorSampler().show { [weak self] color in
+            guard let color else { return }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let hex = Self.hexString(from: color)
+                self.appState?.addColorPick(hex)
+                self.menuBar?.showToast(
+                    symbol: "eyedropper",
+                    tint: .accentColor,
+                    title: "Color copied. Press ⌘V",
+                    snippet: hex
+                )
+            }
+        }
+    }
+
+    private static func hexString(from color: NSColor) -> String {
+        let rgb = color.usingColorSpace(.sRGB) ?? color
+        let r = Int(round(rgb.redComponent * 255))
+        let g = Int(round(rgb.greenComponent * 255))
+        let b = Int(round(rgb.blueComponent * 255))
+        return String(format: "#%02X%02X%02X", r, g, b)
     }
 
     // MARK: - Screen OCR (⌥C)

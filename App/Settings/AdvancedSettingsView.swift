@@ -24,9 +24,7 @@ struct AdvancedSettingsView: View {
             } header: {
                 Text("Pattern detection")
             } footer: {
-                Text("Off by default. Flagged items get a warning icon — they're still captured and encrypted. Heuristics can miss patterns or false-positive; don't rely on them as your only protection (Terms §3).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ExpandableText(text: "Off by default. Flagged items get a warning icon; they're still captured and encrypted. Heuristics can miss patterns or false-positive, so don't rely on them as your only protection (Terms §3).")
             }
 
             Section {
@@ -35,9 +33,7 @@ struct AdvancedSettingsView: View {
                     isOn: appState.settingsBinding(\.clickFixDetection)
                 )
             } footer: {
-                Text("On by default. Warns when the clipboard was overwritten by a website with something that looks like a shell command — the #1 macOS malware-delivery trick. Warnings never block pasting.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                ExpandableText(text: "On by default. Warns when the clipboard was overwritten by a website with something that looks like a shell command, the #1 macOS malware-delivery trick. Warnings never block pasting.")
             }
 
             Section {
@@ -79,7 +75,7 @@ struct AdvancedSettingsView: View {
         warning.alertStyle = .warning
         warning.messageText = "Export decrypted history?"
         warning.informativeText =
-            "The export file is plain JSON — unencrypted, readable by anything. It includes concealed items (passwords). Store it accordingly or delete it after use."
+            "The export file is plain JSON: unencrypted, readable by anything. It includes concealed items (passwords). Store it accordingly or delete it after use."
         warning.addButton(withTitle: "Cancel")
         warning.addButton(withTitle: "Export")
         NSApp.activate(ignoringOtherApps: true)

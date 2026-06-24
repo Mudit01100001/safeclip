@@ -39,9 +39,9 @@ struct OnboardingView: View {
             bullet("lock.shield", "History is encrypted on disk",
                    "AES-256, key in your macOS Keychain. A stolen disk or backup can't read it.")
             bullet("network.slash", "Nothing ever leaves your Mac",
-                   "No servers, no accounts, no telemetry. The source code is public, so this is checkable.")
+                   "No servers, no accounts, no telemetry. Your clipboard stays on this Mac.")
             bullet("hand.raised", "Honest about its limits",
-                   "While you paste, the text briefly sits on the system clipboard where other apps could read it — true of every clipboard manager. SafeClip discloses it instead of overpromising.")
+                   "While you paste, the text briefly sits on the system clipboard where other apps could read it. That's true of every clipboard manager; SafeClip discloses it instead of overpromising.")
 
             Spacer()
 
@@ -60,7 +60,7 @@ struct OnboardingView: View {
     private var shortcutPage: some View {
         VStack(alignment: .leading, spacing: 16) {
             header(symbol: "keyboard", title: "One shortcut, at your cursor",
-                   subtitle: "The panel opens where you're typing — not in the menu bar.")
+                   subtitle: "The panel opens where you're typing, not in the menu bar.")
 
             HStack {
                 Spacer()
@@ -72,9 +72,9 @@ struct OnboardingView: View {
             bullet("cursorarrow.rays", "Appears at the mouse cursor",
                    "Like the emoji picker. Type to search, arrows to choose.")
             bullet("return", "Return pastes plain text",
-                   "⌥Return keeps the original formatting. SafeClip puts the item on the clipboard — you press ⌘V. That one extra keypress means SafeClip needs zero special permissions.")
+                   "⌥Return keeps the original formatting. SafeClip puts the item on the clipboard; you press ⌘V. That one extra keypress means SafeClip needs zero special permissions.")
             bullet("text.cursor", "Optional: anchor to the text caret",
-                   "In Settings you can have the panel open above the blinking text cursor instead of the mouse. That one asks for read-only Accessibility access — to locate the cursor only, never your keystrokes or text — explained in full before macOS prompts you.")
+                   "In Settings you can have the panel open above the blinking text cursor instead of the mouse. That one asks for read-only Accessibility access (to locate the cursor only, never your keystrokes or text), explained in full before macOS prompts you.")
             Spacer()
         }
     }
@@ -84,7 +84,7 @@ struct OnboardingView: View {
     private var privacyPage: some View {
         VStack(alignment: .leading, spacing: 16) {
             header(symbol: "hand.raised.fill", title: "Your privacy posture",
-                   subtitle: "Sensible defaults — everything here can change later in Settings.")
+                   subtitle: "Sensible defaults; everything here can change later in Settings.")
 
             Toggle(
                 "Hide history while screen recording",
@@ -96,7 +96,7 @@ struct OnboardingView: View {
             )
 
             bullet("eye.slash", "Privacy Mode in the menu bar",
-                   "One click hides history instantly — for screen shares SafeClip can't detect.")
+                   "One click hides history instantly, for screen shares SafeClip can't detect.")
             bullet("flame", "Burn after paste",
                    "Right-click any item to delete it from history the moment you paste it once.")
             bullet("app.badge.checkmark", "App exclusions are off by default",

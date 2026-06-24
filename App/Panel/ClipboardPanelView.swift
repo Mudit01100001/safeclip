@@ -147,11 +147,15 @@ struct ClipboardPanelView: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(model.filtered.enumerated()), id: \.element.id) { index, item in
+                        if index == model.imageSectionStart {
+                            imageSectionHeader
+                        }
                         ClipRowView(
                             item: item,
                             isSelected: index == model.selectedIndex,
                             masked: item.isConcealed && model.maskConcealed,
-                            multiOrder: model.multiOrder(of: item)
+                            multiOrder: model.multiOrder(of: item),
+                            onCopyText: { model.copyImageText(item) }
                         )
                         .id(item.id)
                         .onTapGesture {
@@ -169,6 +173,7 @@ struct ClipboardPanelView: View {
                 }
                 .padding(6)
             }
+            .scrollIndicators(.automatic) // native auto-hide; no injected NSView (it broke scroll)
             .onChange(of: model.selectedIndex) {
                 if let selected = model.selectedItem {
                     proxy.scrollTo(selected.id, anchor: nil)
@@ -250,6 +255,19 @@ struct ClipboardPanelView: View {
         return name
     }
 
+    private var imageSectionHeader: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "photo")
+            Text("Appeared in images")
+            Spacer(minLength: 0)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+    }
+
     private var multiSelectionBar: some View {
         HStack(spacing: 6) {
             Image(systemName: "checklist")
@@ -272,7 +290,7 @@ struct ClipboardPanelView: View {
     private var clickFixWarning: some View {
         HStack(spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text("Looks like a shell command copied from a website — don't paste into Terminal.")
+            Text("Looks like a shell command copied from a website. Don't paste into Terminal.")
                 .font(.caption)
         }
         .foregroundStyle(.red)
@@ -289,11 +307,14 @@ struct ClipRowView: View {
     let masked: Bool
     /// 1-based position in the multipaste selection, or nil when not selected.
     var multiOrder: Int? = nil
+    /// Copies the text recognized inside an image clip (hover action).
+    var onCopyText: (() -> Void)? = nil
     /// Concealed rows mask their preview at rest but reveal while hovered, so
     /// the list stays unreadable at a glance yet any item can be checked on
     /// demand. (Many apps over-apply `org.nspasteboard.ConcealedType` — e.g.
     /// Claude, WhatsApp — so this isn't only real passwords.)
     @State private var hovering = false
+    @State private var copiedText = false
 
     private var isMasked: Bool { masked && !hovering }
 
@@ -324,8 +345,27 @@ struct ClipRowView: View {
             Text(displayText)
                 .font(.system(.body, design: isMasked ? .monospaced : .default))
                 .lineLimit(1)
-                .truncationMode(.tail)
+                // Keep the file format (extension) visible on long names.
+                .truncationMode(item.kind == .fileList ? .middle : .tail)
             Spacer(minLength: 8)
+            if item.kind == .image, hovering || copiedText, let onCopyText {
+                Button {
+                    onCopyText()
+                    withAnimation(.easeOut(duration: 0.15)) { copiedText = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+                        withAnimation(.easeIn(duration: 0.2)) { copiedText = false }
+                    }
+                } label: {
+                    Label(
+                        copiedText ? "Copied!" : "Copy Text",
+                        systemImage: copiedText ? "checkmark.circle.fill" : "text.viewfinder"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(copiedText ? AnyShapeStyle(.green) : AnyShapeStyle(.tint))
+                }
+                .buttonStyle(.borderless)
+                .help("Copy the text recognized inside this image")
+            }
             if let multiOrder {
                 Text("\(multiOrder)")
                     .font(.caption2.bold())
@@ -368,6 +408,13 @@ struct ClipRowView: View {
         item.kind == .text && !isMasked && isLikelySVGMarkup(item.plainText)
     }
 
+    /// The system document/folder icon for the first path of a file copy.
+    private var fileIcon: NSImage? {
+        guard item.kind == .fileList,
+              let path = item.plainText.split(separator: "\n").first else { return nil }
+        return NSWorkspace.shared.icon(forFile: String(path))
+    }
+
     private var displayText: String {
         if isMasked { return "••••••••••••" }
         switch item.kind {
@@ -406,7 +453,12 @@ struct ClipRowView: View {
         } else if item.kind == .image {
             Image(systemName: "photo").font(.caption).foregroundStyle(.secondary)
         } else if item.kind == .fileList {
-            Image(systemName: "doc.on.doc").font(.caption).foregroundStyle(.secondary)
+            // Real document/folder icon (Excel, PPT, PDF, folder, …).
+            if let fileIcon {
+                Image(nsImage: fileIcon).resizable().frame(width: 14, height: 14)
+            } else {
+                Image(systemName: "doc.on.doc").font(.caption).foregroundStyle(.secondary)
+            }
         } else if isSVG {
             Image(systemName: "chevron.left.forwardslash.chevron.right")
                 .font(.caption).foregroundStyle(.purple)
@@ -441,7 +493,7 @@ struct ClipRowView: View {
                 "Deleted from history after one paste. Content is briefly readable by other apps during the paste itself (see Terms §3)."
             )
         }
-        if masked { lines.append("Preview hidden — hover to reveal, or press Return to paste.") }
+        if masked { lines.append("Preview hidden. Hover to reveal, or press Return to paste.") }
         return lines.joined(separator: "\n")
     }
 

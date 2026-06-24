@@ -10,6 +10,7 @@ import SwiftUI
 final class MenuBarController: NSObject, NSMenuDelegate {
     struct Actions {
         var showPanel: () -> Void
+        var pickColor: () -> Void
         var openSettings: () -> Void
         var clearAll: () -> Void
         var quit: () -> Void
@@ -40,11 +41,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let button = statusItem.button else { return }
         let (symbol, description): (String, String) =
             if appState.historyHidden {
-                ("eye.slash", "SafeClip — history hidden")
+                ("eye.slash", "SafeClip: history hidden")
             } else if !appState.captureEnabled {
-                ("pause.circle", "SafeClip — capture paused")
+                ("pause.circle", "SafeClip: capture paused")
             } else {
-                ("list.clipboard", "SafeClip — capturing")
+                ("list.clipboard", "SafeClip: capturing")
             }
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: description)
         button.image?.isTemplate = true
@@ -62,6 +63,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 "Show History"
             }
         menu.addItem(makeItem(showTitle, #selector(showPanel)))
+        let pickColor = makeItem("Pick a Color…", #selector(pickColorAction))
+        pickColor.image = NSImage(systemSymbolName: "eyedropper", accessibilityDescription: nil)
+        menu.addItem(pickColor)
         addRecentSection(to: menu)
         menu.addItem(.separator())
 
@@ -74,12 +78,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
         let privacy = makeItem("Privacy Mode (Hide History)", #selector(togglePrivacyMode))
         privacy.state = appState.manualPrivacyMode ? .on : .off
-        privacy.toolTip = "Hide history instantly — for screen shares SafeClip can't detect on its own."
+        privacy.toolTip = "Hide history instantly, for screen shares SafeClip can't detect on its own."
         menu.addItem(privacy)
 
         if appState.pasteboardAccessDenied {
             menu.addItem(.separator())
-            let denied = makeItem("⚠︎ Clipboard access denied — open System Settings…", #selector(openPasteboardSettings))
+            let denied = makeItem("⚠︎ Clipboard access denied. Open System Settings…", #selector(openPasteboardSettings))
             menu.addItem(denied)
         }
 
@@ -135,23 +139,43 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         if clip.isConcealed && appState.settings.maskConcealedPreviews {
             return "••••••••"
         }
-        let raw: String
         switch clip.kind {
         case .image:
-            raw = clip.plainText // "Image W×H"
+            return clip.plainText // "Image W×H"
         case .fileList:
-            raw = clip.plainText.split(separator: "\n").first
+            // Middle-truncate so the file format (extension) stays visible.
+            let name = clip.plainText.split(separator: "\n").first
                 .map { URL(fileURLWithPath: String($0)).lastPathComponent } ?? "Files"
+            return Self.truncatedMiddle(name)
         case .text:
-            raw = clip.plainText
+            let raw = clip.plainText
                 .split(separator: "\n", omittingEmptySubsequences: false).first
                 .map(String.init) ?? clip.plainText
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.count > 48 ? String(trimmed.prefix(48)) + "…" : trimmed
         }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.count > 48 ? String(trimmed.prefix(48)) + "…" : trimmed
+    }
+
+    /// Keeps the start and end of a string (so a filename's extension survives).
+    private static func truncatedMiddle(_ s: String, max: Int = 44) -> String {
+        guard s.count > max else { return s }
+        let head = s.prefix((max * 2) / 3)
+        let tail = s.suffix(max / 3)
+        return "\(head)…\(tail)"
     }
 
     private static func icon(for clip: ClipItem) -> NSImage? {
+        // Plain text gets no icon (matches the floating panel, which leaves
+        // text rows iconless).
+        if clip.flagReason == nil, clip.kind == .text { return nil }
+        // Real document/folder icon for file copies (reflects Excel, PPT, PDF,
+        // folders, …); SF Symbols for everything else.
+        if clip.flagReason == nil, clip.kind == .fileList,
+           let path = clip.plainText.split(separator: "\n").first {
+            let icon = NSWorkspace.shared.icon(forFile: String(path))
+            icon.size = NSSize(width: 16, height: 16)
+            return icon
+        }
         let symbol: String
         switch clip.flagReason {
         case .clickfix: symbol = "exclamationmark.triangle"
@@ -160,7 +184,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         case .none:
             switch clip.kind {
             case .image: symbol = "photo"
-            case .fileList: symbol = "doc.on.doc"
+            case .fileList: symbol = "doc" // unreachable (handled above); keeps the switch total
             case .text: symbol = "doc.on.clipboard"
             }
         }
@@ -211,6 +235,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
+        panel.sharingType = .none // keep toast contents (e.g. a copied value) out of captures
         panel.hidesOnDeactivate = false
         panel.contentViewController = host
         panel.setContentSize(host.view.fittingSize)
@@ -236,6 +261,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     // MARK: - Actions
 
     @objc private func showPanel() { actions.showPanel() }
+
+    @objc private func pickColorAction() { actions.pickColor() }
 
     @objc private func toggleCapture() {
         appState.setCaptureEnabled(!appState.captureEnabled)

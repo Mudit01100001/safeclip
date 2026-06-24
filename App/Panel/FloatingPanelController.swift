@@ -29,6 +29,10 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
     /// One SwiftUI surface for the whole window (body + beak as one callout).
     private let hostingView: NSHostingView<ClipboardPanelView>
     private var keyMonitor: Any?
+    /// Forwards scroll-wheel events to the list: a non-activating panel doesn't
+    /// receive them through the normal responder chain (only the scrollbar
+    /// thumb, a direct mouse drag, works otherwise).
+    private var scrollMonitor: Any?
 
     /// The largest the window ever gets (created at this size, shrunk per show).
     private static var maxWindowSize: NSSize {
@@ -70,6 +74,9 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .utilityWindow
+        // Excluded from screen capture (screenshots AND recordings) — clipboard
+        // history should never end up in someone else's capture. Always on.
+        panel.sharingType = .none
         panel.delegate = self
         for button: NSWindow.ButtonType in [.closeButton, .miniaturizeButton, .zoomButton] {
             panel.standardWindowButton(button)?.isHidden = true
@@ -100,6 +107,29 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         layout(for: resolveAnchor())
         panel.makeKeyAndOrderFront(nil)
         installKeyMonitor()
+        applyOverlayScrollerStyle()
+    }
+
+    /// Make the list scrollbar overlay (auto-hiding). Retried because the
+    /// SwiftUI scroll view may not exist yet on the first frame.
+    private func applyOverlayScrollerStyle() {
+        for delay in [0.0, 0.05, 0.2] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self,
+                      let scrollView = Self.firstScrollView(in: self.panel.contentView) else { return }
+                scrollView.scrollerStyle = .overlay
+                scrollView.autohidesScrollers = true
+            }
+        }
+    }
+
+    private static func firstScrollView(in view: NSView?) -> NSScrollView? {
+        guard let view else { return nil }
+        if let scrollView = view as? NSScrollView { return scrollView }
+        for subview in view.subviews {
+            if let found = firstScrollView(in: subview) { return found }
+        }
+        return nil
     }
 
     /// What the panel points at, in AppKit screen coordinates. `topY`/`bottomY`
@@ -112,19 +142,28 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
     }
 
     private func resolveAnchor() -> Anchor {
-        // Caret first (opt-in, read-only Accessibility); fall back to the mouse
-        // whenever it's off, not granted, or the field exposes no caret bounds.
+        // Caret first (opt-in, read-only Accessibility) — but only when it's
+        // near the pointer, since the pointer is where the user is looking. If
+        // the caret is far away (an inactive field across the window), anchor at
+        // the pointer instead. Threshold is user-tunable.
         if appState.settings.caretAnchoring,
            let caret = CaretLocator.caretRect(assistChromium: appState.settings.assistChromiumApps) {
+            let mouse = NSEvent.mouseLocation
+            let distance = (pow(mouse.x - caret.midX, 2) + pow(mouse.y - caret.midY, 2)).squareRoot()
+            if distance <= appState.settings.caretProximityPoints {
+                #if DEBUG
+                NSLog("SafeClip panel: anchoring to caret \(caret) (dist \(Int(distance)) ≤ \(Int(appState.settings.caretProximityPoints)))")
+                #endif
+                return Anchor(
+                    x: caret.midX,
+                    topY: caret.maxY,       // AppKit y grows up, so the top edge is maxY
+                    bottomY: caret.minY,
+                    screen: screen(containing: CGPoint(x: caret.midX, y: caret.midY))
+                )
+            }
             #if DEBUG
-            NSLog("SafeClip panel: anchoring to caret \(caret)")
+            NSLog("SafeClip panel: caret \(Int(distance))pt from pointer > \(Int(appState.settings.caretProximityPoints)) — using pointer")
             #endif
-            return Anchor(
-                x: caret.midX,
-                topY: caret.maxY,       // AppKit y grows up, so the top edge is maxY
-                bottomY: caret.minY,
-                screen: screen(containing: CGPoint(x: caret.midX, y: caret.midY))
-            )
         }
         let mouse = NSEvent.mouseLocation
         #if DEBUG
@@ -217,12 +256,30 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
             let handled = MainActor.assumeIsolated { self.handleKey(event) }
             return handled ? nil : event
         }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self else { return event }
+            let consumed = MainActor.assumeIsolated { () -> Bool in
+                // Resolve the scroll view *live* under the cursor each event —
+                // caching it at show time raced the SwiftUI layout and made
+                // scrolling work only intermittently.
+                guard self.panel.isVisible, event.window == self.panel,
+                      let hit = self.panel.contentView?.hitTest(event.locationInWindow),
+                      let scrollView = hit.enclosingScrollView else { return false }
+                scrollView.scrollWheel(with: event)
+                return true
+            }
+            return consumed ? nil : event
+        }
     }
 
     private func removeKeyMonitor() {
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
             self.keyMonitor = nil
+        }
+        if let scrollMonitor {
+            NSEvent.removeMonitor(scrollMonitor)
+            self.scrollMonitor = nil
         }
     }
 

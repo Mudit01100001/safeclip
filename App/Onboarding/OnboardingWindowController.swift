@@ -5,10 +5,10 @@ import SwiftUI
 /// the app still works; TERMS §9 makes continued use acceptance.
 @MainActor
 final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
-    private var completion: ((_ acceptedTerms: Bool) -> Void)?
+    private var completion: ((_ result: OnboardingResult) -> Void)?
     private var finished = false
 
-    convenience init(appState: AppState, completion: @escaping (_ acceptedTerms: Bool) -> Void) {
+    convenience init(appState: AppState, completion: @escaping (_ result: OnboardingResult) -> Void) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -27,8 +27,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         self.completion = completion
         window.delegate = self
         window.contentView = NSHostingView(
-            rootView: OnboardingView(appState: appState) { [weak self] accepted in
-                self?.finish(accepted: accepted)
+            rootView: OnboardingView(appState: appState) { [weak self] result in
+                self?.finish(result: result)
             }
         )
     }
@@ -39,15 +39,14 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func finish(accepted: Bool) {
+    private func finish(result: OnboardingResult) {
         guard !finished else { return }
         finished = true
-        completion?(accepted)
+        completion?(result)
         window?.close()
     }
 
     func windowWillClose(_ notification: Notification) {
-        // Red-button close = skip.
-        finish(accepted: false)
+        finish(result: OnboardingResult(acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false))
     }
 }

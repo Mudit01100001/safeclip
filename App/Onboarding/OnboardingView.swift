@@ -7,17 +7,31 @@ import SwiftUI
 /// controls, and a prominent Continue button (back chevron top-left).
 ///
 /// Steps: welcome → plain-text paste (⌥Return) → shortcuts → privacy opt-ins →
-/// permissions → Terms. Closing or Skip records "not accepted"; continued use is
-/// acceptance (TERMS §9).
+/// permissions → Terms & Privacy. Closing or Skip records "not accepted"; all
+/// consent is separate and unchecked by default (DPDP Act 2023 §6) — continued
+/// use after skipping still counts as acceptance of the Terms (TERMS §9), but
+/// the Privacy Policy and marketing checkboxes only ever reflect an explicit
+/// tap, never a default.
+struct OnboardingResult {
+    let acceptedTerms: Bool
+    let acceptedPrivacy: Bool
+    let acceptedMarketing: Bool
+}
+
 struct OnboardingView: View {
     let appState: AppState
-    let onFinish: (_ acceptedTerms: Bool) -> Void
+    let onFinish: (_ result: OnboardingResult) -> Void
 
     @State private var page = 0
-    @State private var termsUnderstood = false
+    @State private var termsAccepted = false
+    @State private var privacyAccepted = false
+    @State private var marketingAccepted = false
+    @State private var showingTerms = false
+    @State private var showingPrivacy = false
 
     private static let stepCount = 6
     private var isLast: Bool { page == Self.stepCount - 1 }
+    private var canFinish: Bool { termsAccepted && privacyAccepted }
 
     var body: some View {
         ZStack {
@@ -43,6 +57,12 @@ struct OnboardingView: View {
         // content's unbounded ideal height and the card stretches absurdly tall.
         .frame(width: 620, height: 640)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showingTerms) {
+            LegalDocumentSheet(resourceName: "TERMS", title: "Terms of Use")
+        }
+        .sheet(isPresented: $showingPrivacy) {
+            LegalDocumentSheet(resourceName: "PRIVACY", title: "Privacy Policy")
+        }
     }
 
     private var background: some View {
@@ -70,10 +90,14 @@ struct OnboardingView: View {
                 .buttonStyle(.plain)
             }
             Spacer()
-            Button("Skip") { onFinish(false) }
-                .buttonStyle(.plain)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Button("Skip") {
+                onFinish(OnboardingResult(
+                    acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false
+                ))
+            }
+            .buttonStyle(.plain)
+            .font(.callout)
+            .foregroundStyle(.secondary)
         }
         .padding(16)
     }
@@ -113,7 +137,7 @@ struct OnboardingView: View {
         case 2: ("keyboard.fill", "Open it from anywhere")
         case 3: ("hand.raised.fill", "Your privacy posture")
         case 4: ("lock.shield.fill", "Permissions")
-        default: ("checkmark.seal.fill", "Terms of Use")
+        default: ("checkmark.seal.fill", "Terms & Privacy")
         }
     }
 
@@ -192,18 +216,54 @@ struct OnboardingView: View {
         }
     }
 
+    // Both Terms and Privacy Policy consent are required, separate, and
+    // unchecked by default (DPDP Act 2023 §6 — no bundled/pre-checked
+    // consent). Marketing is optional and never gates Continue.
     private var termsControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             caption("SafeClip protects the on-disk history, but while you paste, text briefly sits on the system clipboard where other apps could read it — true of every clipboard manager. We disclose it rather than overpromise.")
-            HStack(spacing: 6) {
-                Toggle(isOn: $termsUnderstood) {
-                    Text("I have read and understand the Terms of Use")
+            consentRow(
+                checked: $termsAccepted,
+                label: "I have read and agree to the Terms of Use",
+                buttonLabel: "View Terms",
+                action: { showingTerms = true }
+            )
+            consentRow(
+                checked: $privacyAccepted,
+                label: "I have read and agree to the Privacy Policy",
+                buttonLabel: "View Policy",
+                action: { showingPrivacy = true }
+            )
+            Divider()
+            Toggle(isOn: $marketingAccepted) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Send me release announcements and updates")
+                        .font(.callout)
+                    Text("Optional — unsubscribe any time")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .toggleStyle(.checkbox)
-                Button("Read") { Self.openTerms() }
-                    .buttonStyle(.link)
-                    .font(.callout)
             }
+            .toggleStyle(.checkbox)
+        }
+    }
+
+    private func consentRow(
+        checked: Binding<Bool>,
+        label: String,
+        buttonLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 8) {
+            Toggle(isOn: checked) { EmptyView() }
+                .toggleStyle(.checkbox)
+                .labelsHidden()
+            Text(label).font(.callout)
+            Spacer()
+            Button(buttonLabel, action: action)
+                .font(.callout)
+                .buttonStyle(.borderless)
+                .foregroundStyle(.tint)
         }
     }
 
@@ -220,7 +280,11 @@ struct OnboardingView: View {
     private var footer: some View {
         Button {
             if isLast {
-                onFinish(termsUnderstood)
+                onFinish(OnboardingResult(
+                    acceptedTerms: termsAccepted,
+                    acceptedPrivacy: privacyAccepted,
+                    acceptedMarketing: marketingAccepted
+                ))
             } else {
                 withAnimation(.easeInOut(duration: 0.2)) { page += 1 }
             }
@@ -233,13 +297,7 @@ struct OnboardingView: View {
         .keyboardShortcut(.defaultAction)
         .prominentGlassWhenAvailable()
         .controlSize(.large)
-        .disabled(isLast && !termsUnderstood)
-    }
-
-    private static func openTerms() {
-        if let url = Bundle.main.url(forResource: "TERMS", withExtension: "md") {
-            NSWorkspace.shared.open(url)
-        }
+        .disabled(isLast && !canFinish)
     }
 
     // MARK: - Illustrations (schematic, on-brand)

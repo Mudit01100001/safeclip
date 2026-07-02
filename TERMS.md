@@ -120,8 +120,26 @@ Because SafeClip has no accounts or backend, we cannot notify you of changes to 
 
 ---
 
-## 10. Contact
+## 10. Privacy Policy
 
-This is an open-source project. For questions, security disclosures, or bug reports, please open an issue at [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues).
+SafeClip's Privacy Policy — including details of what data is stored on your device, your rights under India's Digital Personal Data Protection Act 2023, and our Grievance Officer contact — is in [PRIVACY.md](PRIVACY.md).
+
+---
+
+## 11. Grievance Officer (DPDP Act 2023)
+
+In accordance with India's Digital Personal Data Protection Act 2023, the designated Grievance Officer is:
+
+**Mudit Ahlawat**
+Email: m14ahlawat@gmail.com
+GitHub: [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues)
+
+Grievances are acknowledged within 72 hours and resolved within 7 working days.
+
+---
+
+## 12. Contact
+
+This is an open-source project. For questions, bug reports, or feedback, please open an issue at [github.com/Mudit01100001/safeclip/issues](https://github.com/Mudit01100001/safeclip/issues).
 
 For security vulnerabilities, please use GitHub's private security advisory feature rather than a public issue.

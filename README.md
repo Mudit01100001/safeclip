@@ -75,6 +75,7 @@ Requires Xcode 16+ / macOS 14+. Run the test suite with `cd SafeClipCore && swif
 | `docs/ROADMAP.md` | Milestones, research log, decisions |
 | `PRD.md` | Full product spec |
 | `TERMS.md` | Terms of Use — including the disclosed limitations |
+| `PRIVACY.md` | Privacy Policy — DPDP Act 2023 compliant; Grievance Officer contact |
 
 Dependencies: [GRDB.swift](https://github.com/groue/GRDB.swift) (MIT) and [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) (MIT). Both pinned, both auditable.
 

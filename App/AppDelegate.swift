@@ -204,13 +204,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Presents the onboarding wizard (first run and the Settings → About replay).
+    /// Terms, Privacy Policy, and marketing consent are each recorded separately
+    /// (DPDP Act 2023 §6 — no bundling consent into one flag).
     private func presentOnboarding() {
         guard let state = appState else { return }
-        let onboarding = OnboardingWindowController(appState: state) { [weak self] accepted in
+        let onboarding = OnboardingWindowController(appState: state) { [weak self] result in
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: "hasCompletedOnboarding")
-            defaults.set(accepted, forKey: "hasAcceptedTerms")
+            defaults.set(result.acceptedTerms, forKey: "hasAcceptedTerms")
+            defaults.set(result.acceptedPrivacy, forKey: "hasAcceptedPrivacyPolicy")
+            defaults.set(result.acceptedMarketing, forKey: "hasAcceptedMarketing")
             defaults.set("1.0", forKey: "termsVersion")
+            defaults.set("1.0", forKey: "privacyPolicyVersion")
             defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")
             self?.onboardingController = nil
             self?.monitor?.start() // no-op if already running

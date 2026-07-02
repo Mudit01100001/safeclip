@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenWatcher: ScreenRecordWatcher?
     private var maintenanceTimer: Timer?
     private var activationObserver: NSObjectProtocol?
+    /// Retained across a pick so it isn't deallocated mid-overlay.
+    private let colorPicker = ScreenColorPicker()
+    private var snippetExpander: SnippetExpander?
+    private var syncService: SyncService?
 
     static var databaseURL: URL {
         FileManager.default
@@ -67,8 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let state = AppState(store: store, settings: loadedSettings)
         appState = state
+        // E2E folder sync (#12) — experimental, off until the user sets it up.
+        let sync = SyncService(appState: state)
+        syncService = sync
+        state.onWillDelete = { [weak sync] items in sync?.recordDeletion(items) }
+        state.onLocalChange = { [weak sync] in sync?.scheduleSync() }
         panelController = FloatingPanelController(appState: state)
-        settingsController = SettingsWindowController(appState: state)
+        settingsController = SettingsWindowController(appState: state, syncService: sync)
         menuBar = MenuBarController(
             appState: state,
             actions: .init(
@@ -95,7 +104,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.syncLoginItem(settings.launchAtLogin)
             self?.appState?.runMaintenance()
             self?.menuBar?.refreshIcon()
+            self?.snippetExpander?.setEnabled(settings.expandSnippets)
         }
+
+        // Auto-expand snippets (#11) — opt-in + Accessibility-gated; the expander
+        // installs nothing unless the setting is on AND trust is granted.
+        let expander = SnippetExpander(appState: state)
+        snippetExpander = expander
+        expander.setEnabled(state.settings.expandSnippets)
 
         // 5. Screen-recording privacy (F8).
         let watcher = ScreenRecordWatcher()
@@ -116,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
+                self?.syncService?.scheduleSync() // pull peer changes when we come forward
                 guard let settings = self?.appState?.settings,
                       settings.caretAnchoring, settings.assistChromiumApps else { return }
                 CaretLocator.prewarmFrontmostApp()
@@ -152,26 +169,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLoop.main.add(timer, forMode: .common)
         maintenanceTimer = timer
 
+        // E2E folder sync — starts periodic sync only if the user enabled it.
+        sync.start()
+
+        #if DEBUG
+        // Automated scroll diagnosis: SAFECLIP_SCROLL_TEST=1 opens the panel on
+        // launch so it writes /tmp/safeclip-scroll-diag.txt without any UI input.
+        if ProcessInfo.processInfo.environment["SAFECLIP_SCROLL_TEST"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                self?.panelController?.show()
+            }
+        }
+        // SAFECLIP_SELFTEST=<N> runs N automated show/scroll/click cycles with
+        // real synthetic input and writes one aggregate line to
+        // /tmp/safeclip-selftest.txt — moves the real cursor, so it's opt-in
+        // only (never baked into the default scheme like SCROLL_TEST above).
+        if let raw = ProcessInfo.processInfo.environment["SAFECLIP_SELFTEST"], let n = Int(raw), n > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                self?.panelController?.runSelfTest(iterations: n)
+            }
+        }
+        #endif
+
+        // Replay onboarding on demand (Settings → About).
+        state.onReplayOnboarding = { [weak self] in self?.presentOnboarding() }
+
         // 8. Onboarding gate — capture starts only after first-run consent.
         if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
             monitor.start()
         } else {
-            let onboarding = OnboardingWindowController(appState: state) { [weak self] accepted in
-                let defaults = UserDefaults.standard
-                defaults.set(true, forKey: "hasCompletedOnboarding")
-                defaults.set(accepted, forKey: "hasAcceptedTerms")
-                defaults.set("1.0", forKey: "termsVersion")
-                defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")
-                self?.onboardingController = nil
-                self?.monitor?.start()
-                if let settings = self?.appState?.settings {
-                    self?.syncLoginItem(settings.launchAtLogin)
-                }
-            }
-            onboardingController = onboarding
-            onboarding.present()
+            presentOnboarding()
         }
         menuBar?.refreshIcon()
+    }
+
+    /// Presents the onboarding wizard (first run and the Settings → About replay).
+    private func presentOnboarding() {
+        guard let state = appState else { return }
+        let onboarding = OnboardingWindowController(appState: state) { [weak self] accepted in
+            let defaults = UserDefaults.standard
+            defaults.set(true, forKey: "hasCompletedOnboarding")
+            defaults.set(accepted, forKey: "hasAcceptedTerms")
+            defaults.set("1.0", forKey: "termsVersion")
+            defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")
+            self?.onboardingController = nil
+            self?.monitor?.start() // no-op if already running
+            if let settings = self?.appState?.settings {
+                self?.syncLoginItem(settings.launchAtLogin)
+            }
+        }
+        onboardingController = onboarding
+        onboarding.present()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -239,24 +287,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Eyedropper (⌥P)
 
-    /// Picks a color and copies its hex into history. Uses the system sampler
-    /// for now; the custom magnifier eyedropper (ScreenColorPicker) is WIP —
-    /// its overlay locked window-switching, so it's disabled until the
-    /// magnifier version with the owner's icon lands (see ROADMAP / memory).
+    /// Picks a color with the custom magnifier loupe (owner's eyedropper icon)
+    /// and copies its hex into history. Falls back to the system sampler until
+    /// Screen Recording is granted, or in the sandboxed build.
     private func pickColor() {
-        NSColorSampler().show { [weak self] color in
-            guard let color else { return }
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                let hex = Self.hexString(from: color)
-                self.appState?.addColorPick(hex)
-                self.menuBar?.showToast(
-                    symbol: "eyedropper",
-                    tint: .accentColor,
-                    title: "Color copied. Press ⌘V",
-                    snippet: hex
-                )
-            }
+        colorPicker.pick { [weak self] color in
+            guard let color else { return } // user cancelled (Esc)
+            guard let self else { return }
+            let hex = Self.hexString(from: color)
+            self.appState?.addColorPick(hex)
+            self.menuBar?.showToast(
+                symbol: "eyedropper",
+                tint: .accentColor,
+                title: "Color copied. Press ⌘V",
+                snippet: hex
+            )
         }
     }
 

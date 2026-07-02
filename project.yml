@@ -31,6 +31,8 @@ targets:
     platform: macOS
     sources:
       - path: App
+      - path: TERMS.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip
@@ -49,6 +51,8 @@ targets:
         product: KeyboardShortcuts
     scheme:
       testTargets: []
+      environmentVariables:
+        SAFECLIP_SCROLL_TEST: "1"
 
   # Mac App Store channel (Session 4): identical sources, App Sandbox on.
   # Same bundle ID — it's the same app, one channel installed at a time.
@@ -61,6 +65,8 @@ targets:
     platform: macOS
     sources:
       - path: App
+      - path: TERMS.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip

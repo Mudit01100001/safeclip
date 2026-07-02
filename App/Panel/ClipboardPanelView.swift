@@ -9,25 +9,29 @@ struct ClipboardPanelView: View {
     /// Where the callout beak points (set per-show by the controller).
     var arrow: PanelArrowSpec
     @FocusState private var searchFocused: Bool
+    /// Frame of the selected row (in the list's "panelScroll" space), so the
+    /// native scroll view keeps the selection visible during keyboard nav.
+    @State private var selectedRowFrame: CGRect = .zero
 
     var body: some View {
         let shape = CalloutShape(arrow: arrow)
         VStack(spacing: 0) {
             searchField
             Divider()
-            if !model.categories.isEmpty {
-                categoryBar
+            if showChipBar {
+                chipBar
                 Divider()
             }
             content
-            if let selected = model.selectedItem, selected.flagReason == .clickfix {
+            if !model.showingSnippets,
+               let selected = model.selectedItem, selected.flagReason == .clickfix {
                 clickFixWarning
             }
             if model.hasMultiSelection {
                 multiSelectionBar
             }
             Divider()
-            HintBarView(stripByDefault: model.stripByDefault)
+            HintBarView(stripByDefault: model.stripByDefault, snippetsMode: model.showingSnippets)
         }
         // Reserve the beak strip on the arrow edge, then fill whatever size the
         // window currently is (the controller sizes it per show). The shaped
@@ -62,16 +66,28 @@ struct ClipboardPanelView: View {
         .padding(.vertical, 10)
     }
 
-    private var categoryBar: some View {
+    /// The chip bar appears when there are saved snippets to switch to or any
+    /// categories to filter by.
+    private var showChipBar: Bool { model.hasSnippets || !model.categories.isEmpty }
+
+    private var chipBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                categoryChip(title: "All", isSelected: model.selectedCategory == nil) {
+                if model.hasSnippets {
+                    snippetChip
+                }
+                // "All" + categories represent clipboard history. "All" always
+                // appears alongside snippets so there's a way back to history.
+                categoryChip(
+                    title: "All",
+                    isSelected: !model.showingSnippets && model.selectedCategory == nil
+                ) {
                     model.selectCategory(nil)
                 }
                 ForEach(model.categories, id: \.self) { category in
                     categoryChip(
                         title: category,
-                        isSelected: model.selectedCategory == category
+                        isSelected: !model.showingSnippets && model.selectedCategory == category
                     ) {
                         model.selectCategory(model.selectedCategory == category ? nil : category)
                     }
@@ -80,6 +96,26 @@ struct ClipboardPanelView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
         }
+    }
+
+    private var snippetChip: some View {
+        Button {
+            model.showSnippets(!model.showingSnippets)
+        } label: {
+            Label("Snippets", systemImage: "bookmark.fill")
+                .font(.caption)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 3)
+                .background(
+                    model.showingSnippets
+                        ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                    in: Capsule()
+                )
+                .foregroundStyle(
+                    model.showingSnippets ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private func categoryChip(
@@ -104,7 +140,9 @@ struct ClipboardPanelView: View {
     @ViewBuilder
     private var content: some View {
         if model.historyHidden {
-            if model.filtered.isEmpty {
+            // Snippets are equally sensitive on a screen share, so the same
+            // privacy treatment covers whichever list is active.
+            if activeListIsEmpty {
                 PanelPlaceholderView(
                     symbol: "eye.slash",
                     title: "Hidden while screen recording",
@@ -114,7 +152,7 @@ struct ClipboardPanelView: View {
                 // Blur, don't blank: keep the shape of the list so the panel
                 // still reads as itself on a screen share, but no content is
                 // legible. Interaction is off so nothing can be pasted blind.
-                listView
+                activeList
                     .blur(radius: 10)
                     .allowsHitTesting(false)
                     .overlay(alignment: .bottom) {
@@ -129,6 +167,18 @@ struct ClipboardPanelView: View {
                         .padding(.bottom, 12)
                     }
             }
+        } else if model.showingSnippets {
+            if model.filteredSnippets.isEmpty {
+                PanelPlaceholderView(
+                    symbol: "bookmark",
+                    title: model.searchText.isEmpty ? "No saved snippets" : "No matching snippets",
+                    caption: model.searchText.isEmpty
+                        ? "Add snippets in Settings → Snippets."
+                        : "Try a different search."
+                )
+            } else {
+                snippetListView
+            }
         } else if model.filtered.isEmpty {
             PanelPlaceholderView(
                 symbol: "doc.on.clipboard",
@@ -142,44 +192,81 @@ struct ClipboardPanelView: View {
         }
     }
 
-    private var listView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(Array(model.filtered.enumerated()), id: \.element.id) { index, item in
-                        if index == model.imageSectionStart {
-                            imageSectionHeader
-                        }
-                        ClipRowView(
-                            item: item,
-                            isSelected: index == model.selectedIndex,
-                            masked: item.isConcealed && model.maskConcealed,
-                            multiOrder: model.multiOrder(of: item),
-                            onCopyText: { model.copyImageText(item) }
-                        )
-                        .id(item.id)
+    private var activeListIsEmpty: Bool {
+        model.showingSnippets ? model.filteredSnippets.isEmpty : model.filtered.isEmpty
+    }
+
+    @ViewBuilder
+    private var activeList: some View {
+        if model.showingSnippets { snippetListView } else { listView }
+    }
+
+    private var snippetListView: some View {
+        // Native NSScrollView (not SwiftUI's ScrollView) so the wheel/trackpad
+        // scroll works inside the floating panel. Selection-frame reporting keeps
+        // the keyboard-selected row visible.
+        NativeScrollView(revealFrame: selectedRowFrame) {
+            // VStack, NOT LazyVStack: inside the native scroll view's hosting
+            // document, a LazyVStack only lays out visible rows, so it never
+            // reports the full content height and there's nothing to scroll.
+            VStack(spacing: 2) {
+                ForEach(Array(model.filteredSnippets.enumerated()), id: \.element.id) { index, snippet in
+                    SnippetRowView(
+                        snippet: snippet,
+                        isSelected: index == model.selectedSnippetIndex,
+                        isJustCopied: model.justCopiedID == snippet.id
+                    )
+                        .id(snippet.id)
+                        .reportsSelectedRowFrame(index == model.selectedSnippetIndex, into: $selectedRowFrame)
                         .onTapGesture {
-                            // ⌘-click builds an ordered multipaste set; a plain
-                            // click pastes that one item immediately.
-                            if NSEvent.modifierFlags.contains(.command) {
-                                model.toggleMultiSelect(item)
-                            } else {
-                                model.select(index)
-                                model.paste(item, optionHeld: false)
-                            }
+                            model.selectSnippet(index)
+                            model.clickPasteSnippet(snippet)
                         }
-                        .contextMenu { contextMenu(for: item) }
-                    }
-                }
-                .padding(6)
-            }
-            .scrollIndicators(.automatic) // native auto-hide; no injected NSView (it broke scroll)
-            .onChange(of: model.selectedIndex) {
-                if let selected = model.selectedItem {
-                    proxy.scrollTo(selected.id, anchor: nil)
                 }
             }
+            .padding(6)
+            .coordinateSpace(name: "panelScroll")
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var listView: some View {
+        NativeScrollView(revealFrame: selectedRowFrame) {
+            // VStack, NOT LazyVStack — see snippetListView: a LazyVStack in the
+            // native scroll view's document never reports full height, so the
+            // list can't scroll. History is capped (~200), so VStack is fine.
+            VStack(spacing: 2) {
+                ForEach(Array(model.filtered.enumerated()), id: \.element.id) { index, item in
+                    if index == model.imageSectionStart {
+                        imageSectionHeader
+                    }
+                    ClipRowView(
+                        item: item,
+                        isSelected: index == model.selectedIndex,
+                        masked: item.isConcealed && model.maskConcealed,
+                        multiOrder: model.multiOrder(of: item),
+                        isJustCopied: model.justCopiedID == item.id,
+                        onCopyText: { model.copyImageText(item) }
+                    )
+                    .id(item.id)
+                    .reportsSelectedRowFrame(index == model.selectedIndex, into: $selectedRowFrame)
+                    .onTapGesture {
+                        // ⌘-click builds an ordered multipaste set; a plain
+                        // click pastes that one item immediately.
+                        if NSEvent.modifierFlags.contains(.command) {
+                            model.toggleMultiSelect(item)
+                        } else {
+                            model.select(index)
+                            model.clickPaste(item, optionHeld: false)
+                        }
+                    }
+                    .contextMenu { contextMenu(for: item) }
+                }
+            }
+            .padding(6)
+            .coordinateSpace(name: "panelScroll")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -307,6 +394,9 @@ struct ClipRowView: View {
     let masked: Bool
     /// 1-based position in the multipaste selection, or nil when not selected.
     var multiOrder: Int? = nil
+    /// True for a brief window right after a click-to-paste — flashes the row
+    /// green so the user sees which item was copied before the panel closes.
+    var isJustCopied: Bool = false
     /// Copies the text recognized inside an image clip (hover action).
     var onCopyText: (() -> Void)? = nil
     /// Concealed rows mask their preview at rest but reveal while hovered, so
@@ -348,6 +438,15 @@ struct ClipRowView: View {
                 // Keep the file format (extension) visible on long names.
                 .truncationMode(item.kind == .fileList ? .middle : .tail)
             Spacer(minLength: 8)
+            if isJustCopied {
+                Label("Copied", systemImage: "checkmark.circle.fill")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor, in: Capsule())
+                    .transition(.scale.combined(with: .opacity))
+            }
             if item.kind == .image, hovering || copiedText, let onCopyText {
                 Button {
                     onCopyText()
@@ -381,12 +480,19 @@ struct ClipRowView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.accentColor, lineWidth: isJustCopied ? 2 : 0)
+        )
+        .scaleEffect(isJustCopied ? 0.97 : 1)
+        .animation(.spring(response: 0.18, dampingFraction: 0.5), value: isJustCopied)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .help(helpText)
     }
 
     private var rowBackground: AnyShapeStyle {
+        if isJustCopied { return AnyShapeStyle(Color.accentColor.opacity(0.6)) }
         if isSelected { return AnyShapeStyle(Color.accentColor.opacity(0.22)) }
         if multiOrder != nil { return AnyShapeStyle(Color.accentColor.opacity(0.12)) }
         return AnyShapeStyle(.clear)
@@ -504,6 +610,61 @@ struct ClipRowView: View {
     }
 }
 
+/// One saved-snippet row in the panel: bookmark glyph, label, and a one-line
+/// body preview. Clicking places the body on the clipboard for the user's ⌘V.
+struct SnippetRowView: View {
+    let snippet: Snippet
+    let isSelected: Bool
+    var isJustCopied: Bool = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bookmark.fill")
+                .font(.caption)
+                .foregroundStyle(.tint)
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(snippet.label.isEmpty ? snippet.bodyPreview : snippet.label)
+                    .font(.body)
+                    .lineLimit(1)
+                if !snippet.label.isEmpty, !snippet.bodyPreview.isEmpty {
+                    Text(snippet.bodyPreview)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            if isJustCopied {
+                Label("Copied", systemImage: "checkmark.circle.fill")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor, in: Capsule())
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(snippetRowBackground, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.accentColor, lineWidth: isJustCopied ? 2 : 0)
+        )
+        .scaleEffect(isJustCopied ? 0.97 : 1)
+        .animation(.spring(response: 0.18, dampingFraction: 0.5), value: isJustCopied)
+        .contentShape(Rectangle())
+        .help(snippet.label.isEmpty ? snippet.bodyPreview : snippet.label)
+    }
+
+    private var snippetRowBackground: AnyShapeStyle {
+        if isJustCopied { return AnyShapeStyle(Color.accentColor.opacity(0.6)) }
+        if isSelected { return AnyShapeStyle(Color.accentColor.opacity(0.22)) }
+        return AnyShapeStyle(.clear)
+    }
+}
+
 struct PanelPlaceholderView: View {
     let symbol: String
     let title: String
@@ -527,14 +688,22 @@ struct PanelPlaceholderView: View {
 
 struct HintBarView: View {
     let stripByDefault: Bool
+    /// Snippet rows paste a single body and aren't pinned/deleted from the panel,
+    /// so the hint set is trimmed to what actually applies.
+    var snippetsMode: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
-            hint("↩", stripByDefault ? "paste" : "paste rich")
-            hint("⌥↩", stripByDefault ? "keep format" : "plain")
-            hint("⌘⌫", "delete")
-            hint("⌘P", "pin")
-            hint("⎋", "close")
+            if snippetsMode {
+                hint("↩", "paste")
+                hint("⎋", "close")
+            } else {
+                hint("↩", stripByDefault ? "paste" : "paste rich")
+                hint("⌥↩", stripByDefault ? "keep format" : "plain")
+                hint("⌘⌫", "delete")
+                hint("⌘P", "pin")
+                hint("⎋", "close")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)

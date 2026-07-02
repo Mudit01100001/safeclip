@@ -54,6 +54,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var assistChromiumApps: Bool = true           // with caret anchoring: switch on Chromium/Electron a11y so the caret is readable there
     var caretProximityPoints: Double = 500        // anchor to the caret only within this many points of the pointer; else use the pointer
     var quickPasteModifier: QuickPasteModifier = .controlCommand  // base modifier for ⌃⌘1…0 quick-paste slots
+    var expandSnippets: Bool = false              // opt-in #11: type a trigger → expand snippet (needs Accessibility; synthesizes keystrokes)
+    var syncEnabled: Bool = false                 // opt-in #12: E2E-encrypted history sync via a shared folder (experimental)
     // Debug builds default OFF so only the build you explicitly launch runs —
     // a Debug build registering itself as a login item is what resurrected
     // stale DerivedData bundles during development. Release ships ON.
@@ -94,6 +96,8 @@ extension AppSettings {
         assistChromiumApps = try c.decodeIfPresent(Bool.self, forKey: .assistChromiumApps) ?? d.assistChromiumApps
         caretProximityPoints = try c.decodeIfPresent(Double.self, forKey: .caretProximityPoints) ?? d.caretProximityPoints
         quickPasteModifier = try c.decodeIfPresent(QuickPasteModifier.self, forKey: .quickPasteModifier) ?? d.quickPasteModifier
+        expandSnippets = try c.decodeIfPresent(Bool.self, forKey: .expandSnippets) ?? d.expandSnippets
+        syncEnabled = try c.decodeIfPresent(Bool.self, forKey: .syncEnabled) ?? d.syncEnabled
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? d.launchAtLogin
     }
 }
@@ -137,6 +141,9 @@ struct PasteboardCapture: Sendable {
 @Observable
 final class AppState {
     private(set) var clips: [ClipItem] = []
+    /// User-authored saved snippets (curated, persistent — separate from the
+    /// rolling clipboard history). Surfaced in the panel and Settings → Snippets.
+    private(set) var snippets: [Snippet] = []
     private(set) var captureEnabled = true
     var isRecordingScreen = false
     var manualPrivacyMode = false
@@ -151,11 +158,23 @@ final class AppState {
     var onCaptureToggled: ((Bool) -> Void)?
     var onSettingsApplied: ((AppSettings) -> Void)?
     var onDisplayStateChanged: (() -> Void)?
+    var onReplayOnboarding: (() -> Void)?
+    /// Called with items about to be removed so the sync engine can record a
+    /// tombstone (it needs the content to compute the shared sync hash) before
+    /// the row is gone. No-op unless sync is configured.
+    var onWillDelete: (([ClipItem]) -> Void)?
+    /// Called after a user-initiated change so the sync engine can publish it
+    /// (debounced). No-op unless sync is configured.
+    var onLocalChange: (() -> Void)?
+
+    /// Re-presents the first-run onboarding wizard on demand (Settings → About).
+    func replayOnboarding() { onReplayOnboarding?() }
 
     init(store: HistoryStore, settings: AppSettings) {
         self.store = store
         self.settings = settings
         reloadHistory()
+        reloadSnippets()
     }
 
     /// Panel content is hidden while screen recording is suspected (F8) or
@@ -267,6 +286,7 @@ final class AppState {
                 try store.enforceLimit(settings.historyLimit)
             }
             reloadHistory()
+            if case .inserted = outcome { onLocalChange?() }
             // Index text inside newly-stored images on-device so they're
             // searchable. Runs after insert so the image appears immediately;
             // the OCR text fills in shortly after.
@@ -313,14 +333,23 @@ final class AppState {
         )
         try? store.markUsed(id: item.id)
         if item.isBurn {
+            onWillDelete?([item])
             try? store.delete(id: item.id) // F7: burn after paste
         }
         reloadHistory()
+        onLocalChange?()
     }
 
     /// "Copy again" from the context menu — same placement path as paste.
     func copyAgain(_ item: ClipItem) {
         paste(item, optionHeld: false)
+    }
+
+    /// Places text on the clipboard marked as our own write, so the monitor does
+    /// NOT capture it into history. Used for the sync recovery phrase, which is
+    /// the shared key and must never be stored.
+    func copyToClipboard(_ text: String) {
+        pasteService.placePlainText(text)
     }
 
     /// Multipaste: combines several items (in the given order) into one
@@ -364,29 +393,36 @@ final class AppState {
     }
 
     func deleteItem(_ item: ClipItem) {
+        onWillDelete?([item])
         try? store.delete(id: item.id)
         reloadHistory()
+        onLocalChange?()
     }
 
     func togglePin(_ item: ClipItem) {
         try? store.setPinned(id: item.id, !item.isPinned)
         reloadHistory()
+        onLocalChange?()
     }
 
     func toggleBurn(_ item: ClipItem) {
         try? store.setBurn(id: item.id, !item.isBurn)
         reloadHistory()
+        onLocalChange?()
     }
 
     /// Assigns or clears an item's category (collection). `nil`/empty clears it.
     func setCategory(_ item: ClipItem, _ category: String?) {
         try? store.setCategory(id: item.id, category)
         reloadHistory()
+        onLocalChange?()
     }
 
     func clearAll() {
-        try? store.deleteAll() // F6
+        onWillDelete?(clips) // F6 — record tombstones so the clear propagates
+        try? store.deleteAll()
         reloadHistory()
+        onLocalChange?()
     }
 
     /// Clears flags on all items (un-masks anything an earlier scan mislabeled)
@@ -412,6 +448,49 @@ final class AppState {
     /// list). Already-stored rows stay un-masked until copied again.
     func resumeConcealing(source bundleID: String) {
         updateSettings { $0.ignoreConcealedFrom.removeAll { $0 == bundleID } }
+    }
+
+    // MARK: - Snippets (#9)
+
+    func reloadSnippets() {
+        snippets = (try? store.fetchSnippets()) ?? []
+    }
+
+    @discardableResult
+    func addSnippet(label: String, body: String, trigger: String? = nil) -> Snippet? {
+        let created = try? store.insertSnippet(label: label, body: body, trigger: trigger)
+        reloadSnippets()
+        return created ?? nil
+    }
+
+    func updateSnippet(_ snippet: Snippet, label: String, body: String, trigger: String? = nil) {
+        try? store.updateSnippet(id: snippet.id, label: label, body: body, trigger: trigger)
+        reloadSnippets()
+    }
+
+    func deleteSnippet(_ snippet: Snippet) {
+        try? store.deleteSnippet(id: snippet.id)
+        reloadSnippets()
+    }
+
+    /// Bumps a snippet's recency without placing it (used by auto-expand).
+    func markSnippetUsed(_ snippet: Snippet) {
+        try? store.markSnippetUsed(id: snippet.id)
+    }
+
+    /// Persists a new snippet ordering (drag-to-reorder in Settings).
+    func reorderSnippets(_ orderedIDs: [UUID]) {
+        try? store.reorderSnippets(orderedIDs)
+        reloadSnippets()
+    }
+
+    /// Places a snippet's body on the clipboard for the user's own ⌘V — the
+    /// same pillar-safe path as every paste (no synthesized keystrokes). The
+    /// write is marked as ours, so it isn't re-captured into history.
+    func pasteSnippet(_ snippet: Snippet) {
+        pasteService.placePlainText(snippet.body)
+        try? store.markSnippetUsed(id: snippet.id)
+        reloadSnippets()
     }
 
     /// Expiry sweep + history-limit enforcement; runs at launch and hourly.

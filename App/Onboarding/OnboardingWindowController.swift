@@ -10,13 +10,17 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     convenience init(appState: AppState, completion: @escaping (_ acceptedTerms: Bool) -> Void) {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
             styleMask: [.titled, .closable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Welcome to SafeClip"
+        window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = NSColor(white: 0.1, alpha: 1)
         window.center()
         window.isReleasedWhenClosed = false
         self.init(window: window)

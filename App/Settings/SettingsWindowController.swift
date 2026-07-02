@@ -6,17 +6,25 @@ import SwiftUI
 /// have no standard app menu.
 @MainActor
 final class SettingsWindowController: NSWindowController {
-    convenience init(appState: AppState) {
+    private var scrollerTimer: Timer?
+
+    convenience init(appState: AppState, syncService: SyncService) {
+        // Wider than the tab strip needs so the system-rendered tabs (which sit
+        // in the title bar) centre clear of the traffic lights instead of being
+        // shoved right. Autosave name bumped so this new width takes effect even
+        // where the old 560-wide frame was already remembered.
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 600),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "SafeClip Settings"
-        window.contentView = NSHostingView(rootView: SettingsView(appState: appState))
+        window.contentView = NSHostingView(
+            rootView: SettingsView(appState: appState, syncService: syncService)
+        )
         window.center()
-        window.setFrameAutosaveName("SafeClipSettings")
+        window.setFrameAutosaveName("SafeClipSettingsWide")
         window.isReleasedWhenClosed = false
         self.init(window: window)
     }
@@ -26,13 +34,24 @@ final class SettingsWindowController: NSWindowController {
         window?.makeKeyAndOrderFront(nil)
         // Explicit user intent ("Settings…" clicked) justifies activation.
         NSApp.activate(ignoringOtherApps: true)
-        // SwiftUI grouped Forms default to legacy (always-on) scrollers; flip
-        // every scroll view in the window to overlay so the bar auto-hides.
-        if let content = window?.contentView {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        startScrollerStyling()
+    }
+
+    /// SwiftUI Forms/Lists default to legacy always-on scrollers, and a `TabView`
+    /// only builds a tab's scroll view when you first switch to it — so a one-time
+    /// pass styles only the General tab. A light repeating pass (a no-op while the
+    /// window is hidden) catches every tab as it appears.
+    private func startScrollerStyling() {
+        scrollerTimer?.invalidate()
+        let timer = Timer(timeInterval: 0.4, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let window = self?.window, window.isVisible,
+                      let content = window.contentView else { return }
                 Self.applyOverlayScrollers(in: content)
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        scrollerTimer = timer
     }
 
     private static func applyOverlayScrollers(in view: NSView) {

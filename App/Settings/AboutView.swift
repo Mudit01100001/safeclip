@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AboutView: View {
+    let appState: AppState
+
     private var version: String {
         let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
@@ -19,6 +21,8 @@ struct AboutView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 380)
+
+            Button("Show Onboarding Again") { appState.replayOnboarding() }
 
             Divider().frame(width: 320)
 

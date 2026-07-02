@@ -259,4 +259,90 @@ struct HistoryStoreTests {
         try store.setOCRText(id: id, nil)
         #expect(try store.fetchAll().first?.ocrText == nil)
     }
+
+    // MARK: - Snippets (v5)
+
+    @Test func snippetInsertRoundTrips() throws {
+        let store = try makeStore()
+        let created = try #require(try store.insertSnippet(label: "  Work email  ", body: "me@work.com"))
+        #expect(created.label == "Work email", "label is trimmed")
+        #expect(created.body == "me@work.com")
+
+        let all = try store.fetchSnippets()
+        #expect(all.count == 1)
+        #expect(all[0].label == "Work email")
+        #expect(all[0].body == "me@work.com")
+        #expect(all[0].id == created.id)
+    }
+
+    @Test func snippetRejectsFullyEmpty() throws {
+        let store = try makeStore()
+        #expect(try store.insertSnippet(label: "   ", body: "") == nil)
+        #expect(try store.fetchSnippets().isEmpty)
+    }
+
+    @Test func snippetBlobsContainNoPlaintext() throws {
+        let store = try makeStore()
+        let label = "SecretSignature"
+        let body = "Mudit Ahlawat — Confidential Footer 2026"
+        _ = try store.insertSnippet(label: label, body: body)
+        for row in try store.rawSnippetRows() {
+            let labelCipher: Data = row["label_cipher"]
+            let bodyCipher: Data = row["body_cipher"]
+            #expect(labelCipher.range(of: Data(label.utf8)) == nil, "label ciphertext leaks plaintext")
+            #expect(bodyCipher.range(of: Data(body.utf8)) == nil, "body ciphertext leaks plaintext")
+        }
+    }
+
+    @Test func snippetUpdateAndDelete() throws {
+        let store = try makeStore()
+        let s = try #require(try store.insertSnippet(label: "Old", body: "old body"))
+        try store.updateSnippet(id: s.id, label: "New", body: "new body")
+        let updated = try #require(try store.fetchSnippets().first)
+        #expect(updated.label == "New")
+        #expect(updated.body == "new body")
+
+        try store.deleteSnippet(id: s.id)
+        #expect(try store.fetchSnippets().isEmpty)
+    }
+
+    @Test func snippetsKeepInsertionOrderThenReorder() throws {
+        let store = try makeStore()
+        let a = try #require(try store.insertSnippet(label: "A", body: "a"))
+        let b = try #require(try store.insertSnippet(label: "B", body: "b"))
+        let c = try #require(try store.insertSnippet(label: "C", body: "c"))
+        #expect(try store.fetchSnippets().map(\.label) == ["A", "B", "C"], "new snippets append")
+
+        // Move C to the front.
+        try store.reorderSnippets([c.id, a.id, b.id])
+        #expect(try store.fetchSnippets().map(\.label) == ["C", "A", "B"])
+    }
+
+    @Test func snippetTriggerRoundTripsTrimsAndEncrypts() throws {
+        let store = try makeStore()
+        let s = try #require(try store.insertSnippet(label: "Sig", body: "best,\nMudit", trigger: "  ;sig  "))
+        #expect(s.trigger == ";sig", "trigger trimmed")
+        #expect(try store.fetchSnippets().first?.trigger == ";sig")
+
+        // Empty trigger clears to nil.
+        try store.updateSnippet(id: s.id, label: "Sig", body: "best,\nMudit", trigger: "   ")
+        #expect(try store.fetchSnippets().first?.trigger == nil)
+
+        // Trigger is encrypted at rest.
+        try store.updateSnippet(id: s.id, label: "Sig", body: "x", trigger: ";secret")
+        for row in try store.rawSnippetRows() {
+            let cipher: Data? = row["trigger_cipher"]
+            #expect(cipher?.range(of: Data(";secret".utf8)) == nil, "trigger ciphertext leaks plaintext")
+        }
+    }
+
+    @Test func snippetsSurviveExpirySweepAndLimit() throws {
+        let store = try makeStore()
+        _ = try store.insertSnippet(label: "Permanent", body: "kept")
+        // Sweeping clip expiry and enforcing the clip limit must not touch
+        // snippets — they live in their own table.
+        try store.sweepExpired(olderThan: Date(timeIntervalSince1970: 4_000_000_000)) // year ~2096
+        _ = try store.enforceLimit(1)
+        #expect(try store.fetchSnippets().count == 1, "snippets are exempt from history expiry/limit")
+    }
 }

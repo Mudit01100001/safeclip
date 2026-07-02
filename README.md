@@ -32,7 +32,7 @@ Every mainstream macOS clipboard manager stores your history as plaintext on dis
 - The dedup index is a *keyed* HMAC, not a plain hash — a copied password can't be offline-guessed from the database file.
 - Deleted items (burn-after-paste, Clear All) are zeroed in the database file (`secure_delete`), not just unlinked.
 - Password-manager copies (marked `org.nspasteboard.ConcealedType`) are flagged, masked in the panel, and optionally burned after one paste. After pasting a sensitive item SafeClip can wipe the system clipboard if nothing replaced it (35s default).
-- No servers, no accounts, no telemetry, no analytics. The code is right here.
+- No servers, no accounts, no telemetry, no analytics. The code is right here. The one exception: an optional update check (off until you enable it or click "Check for Updates…"), which asks safeclip.app for a version number and nothing else — see [PRIVACY.md](PRIVACY.md) §4.
 
 **What's not protected — read [TERMS.md](TERMS.md) §3**
 - **The paste window.** When you paste, the plaintext briefly sits on the macOS system clipboard where other running apps could read it. True of every clipboard manager; no public API avoids it. We disclose it instead of pretending.

@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let colorPicker = ScreenColorPicker()
     private var snippetExpander: SnippetExpander?
     private var syncService: SyncService?
+    private let updateService = UpdateService()
 
     static var databaseURL: URL {
         FileManager.default
@@ -77,13 +78,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.onWillDelete = { [weak sync] items in sync?.recordDeletion(items) }
         state.onLocalChange = { [weak sync] in sync?.scheduleSync() }
         panelController = FloatingPanelController(appState: state)
-        settingsController = SettingsWindowController(appState: state, syncService: sync)
+        settingsController = SettingsWindowController(appState: state, syncService: sync, updateService: updateService)
         menuBar = MenuBarController(
             appState: state,
             actions: .init(
                 showPanel: { [weak self] in self?.panelController?.toggle() },
                 pickColor: { [weak self] in self?.pickColor() },
                 openSettings: { [weak self] in self?.settingsController?.open() },
+                checkForUpdates: { [weak self] in self?.updateService.checkForUpdates() },
                 clearAll: { [weak state] in state?.clearAll() },
                 quit: { NSApp.terminate(nil) }
             )

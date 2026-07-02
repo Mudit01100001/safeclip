@@ -8,7 +8,7 @@ import SwiftUI
 final class SettingsWindowController: NSWindowController {
     private var scrollerTimer: Timer?
 
-    convenience init(appState: AppState, syncService: SyncService) {
+    convenience init(appState: AppState, syncService: SyncService, updateService: UpdateService) {
         // Wider than the tab strip needs so the system-rendered tabs (which sit
         // in the title bar) centre clear of the traffic lights instead of being
         // shoved right. Autosave name bumped so this new width takes effect even
@@ -21,7 +21,7 @@ final class SettingsWindowController: NSWindowController {
         )
         window.title = "SafeClip Settings"
         window.contentView = NSHostingView(
-            rootView: SettingsView(appState: appState, syncService: syncService)
+            rootView: SettingsView(appState: appState, syncService: syncService, updateService: updateService)
         )
         window.center()
         window.setFrameAutosaveName("SafeClipSettingsWide")

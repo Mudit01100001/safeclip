@@ -30,5 +30,28 @@
 	<string>© 2026 SafeClip. All rights reserved.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<!--
+	Sparkle updater config (Session 15). Inert unless the Sparkle package is
+	linked, which it only is on the GitHub `SafeClip` target — the MAS target
+	shares this Info.plist but never imports Sparkle, so these keys are dead
+	weight there, not a live capability.
+	-->
+	<key>SUFeedURL</key>
+	<string>https://safeclip.app/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>Ia6I178YCzQ/93pQIZkRNtglwY0Yvudj6npzrX/lthM=</string>
+	<!-- Off by default: the app makes no network call until the user either
+	     clicks "Check for Updates…" or opts into automatic checks in
+	     Settings → Updates (UpdateService.swift owns that consent flow). -->
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<!-- No OS/hardware/app-version telemetry on update checks. -->
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<!-- Always show the "update available" dialog; never install silently. -->
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
 </dict>
 </plist>

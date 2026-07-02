@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0128650B0F671694446C08BF /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1FC85E847A57EAEBC802449 /* MenuBarController.swift */; };
 		03DE2B3A8AE2AE51635B77BD /* SnippetExpander.swift in Sources */ = {isa = PBXBuildFile; fileRef = D68218ECD8726249F3E65793 /* SnippetExpander.swift */; };
+		0527442DD291E7F7D46004EA /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 29623AF187DA2CB2CA435B5C /* Sparkle */; };
 		05E9CFF9517FA70251ED2CF3 /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9A523F0099E8C1D92A5488 /* SyncSettingsView.swift */; };
 		06225DF0F5808E02E17B9A60 /* ClipboardPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8110AD2FFFB61991E97A8AB /* ClipboardPanelView.swift */; };
 		0CCF405098FDCF68969C4088 /* ColorLoupe.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC818253CE82F886F93CBF5D /* ColorLoupe.swift */; };
@@ -40,9 +41,11 @@
 		69EEFA1D4AB9F7DF865EDCD9 /* ClipboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 964B230BAC874D85DAFE3958 /* ClipboardMonitor.swift */; };
 		6B33C06C8EA6D0D8BB5A8138 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 98331C63C481C3F50890CA41 /* Assets.xcassets */; };
 		70C407A0DC7375116A32CFC8 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7E7DBBF672C48EB423A202 /* SettingsComponents.swift */; };
+		78E94D08A2E829BE9A85B6A8 /* UpdatesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E86EC001E4BF79EEA7F13AC5 /* UpdatesSettingsView.swift */; };
 		79D8C2D887643AE92FC10041 /* PanelChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19F282F156093A301A88DC5 /* PanelChrome.swift */; };
 		800BF18583CEA616C4D017E5 /* OCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAEAC84A23E7E984BF8CE2D3 /* OCRService.swift */; };
 		803BE6AE402125FF1746912B /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9A523F0099E8C1D92A5488 /* SyncSettingsView.swift */; };
+		8B1B388E951CEB0DF40D6621 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591D844942C9F8658D075013 /* UpdateService.swift */; };
 		8D68AE409FA6C8F6D7225B87 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62B7BE197BAA4E64B7965F9 /* AboutView.swift */; };
 		943D4F8E10BC78E272298B49 /* OCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAEAC84A23E7E984BF8CE2D3 /* OCRService.swift */; };
 		94A884D1BA7E6E51FADD4BA7 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C568ADBC94E2D2E16C614B09 /* AppState.swift */; };
@@ -51,12 +54,14 @@
 		9C424823F53F4DFBB450A779 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62B7BE197BAA4E64B7965F9 /* AboutView.swift */; };
 		9DA55600B98E75BB9482222A /* Shortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4FEC8304AF5BC53C53AC1C /* Shortcuts.swift */; };
 		9DF924C1E7966F0C31B74C7F /* PanelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA873496988F4683229E497A /* PanelViewModel.swift */; };
+		9EFCFB6CD482C928B390F1D3 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591D844942C9F8658D075013 /* UpdateService.swift */; };
 		A55345E82B665BD47A4A9A72 /* ScreenOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0746E5F88114AD492FE733CA /* ScreenOCRService.swift */; };
 		A7787FA1191A888D11D66024 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D7E7DBBF672C48EB423A202 /* SettingsComponents.swift */; };
 		AA80DC4840E858AD3502D8DE /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51A21C8E2CDC291B4BDA5E20 /* SettingsWindowController.swift */; };
 		AAB0F2CC06FF816014A9394B /* AdvancedSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90012535C28160CD724DA632 /* AdvancedSettingsView.swift */; };
 		AD3CC89A8D42F717B2EF5841 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04FD0E1D22B603D68E04C13 /* OnboardingView.swift */; };
 		AF153885848BE8A6F04A7A33 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A2C4787E518FD5034E79291 /* AppDelegate.swift */; };
+		B1FC8B95A4DD6A1CE74067D0 /* UpdatesSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E86EC001E4BF79EEA7F13AC5 /* UpdatesSettingsView.swift */; };
 		B2A0749B9662BDBCF59CE55A /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04FD0E1D22B603D68E04C13 /* OnboardingView.swift */; };
 		B4D0F377982B00F3E84C3115 /* ScreenOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0746E5F88114AD492FE733CA /* ScreenOCRService.swift */; };
 		B5B2FF557857D2FDF9E856C3 /* ScreenRecordWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D5CA5CB5D24EF4D10BAC9A /* ScreenRecordWatcher.swift */; };
@@ -97,6 +102,7 @@
 		420367A6328F77C83E62905B /* NativeScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeScrollView.swift; sourceTree = "<group>"; };
 		51A21C8E2CDC291B4BDA5E20 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		5692800376B90EE97F9311E1 /* LegalDocumentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalDocumentSheet.swift; sourceTree = "<group>"; };
+		591D844942C9F8658D075013 /* UpdateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateService.swift; sourceTree = "<group>"; };
 		612D7BECDA35FA09612E3849 /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
 		6801661ECA6F598596C0F7C5 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		69F42FD9B0FCAF542871565C /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
@@ -117,6 +123,7 @@
 		CF9A523F0099E8C1D92A5488 /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		D62B7BE197BAA4E64B7965F9 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		D68218ECD8726249F3E65793 /* SnippetExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetExpander.swift; sourceTree = "<group>"; };
+		E86EC001E4BF79EEA7F13AC5 /* UpdatesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatesSettingsView.swift; sourceTree = "<group>"; };
 		EC4B9AF6278F8DE2023A8FB0 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		EFFC11E2FB44609C52CA450C /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
 		F14AAF45C2D4451C7CEBD488 /* TERMS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TERMS.md; sourceTree = "<group>"; };
@@ -140,6 +147,7 @@
 			files = (
 				FED54768366116D622DBE92E /* SafeClipCore in Frameworks */,
 				65105E890A95EA8CE5AB7674 /* KeyboardShortcuts in Frameworks */,
+				0527442DD291E7F7D46004EA /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,6 +167,7 @@
 				70D5CA5CB5D24EF4D10BAC9A /* ScreenRecordWatcher.swift */,
 				D68218ECD8726249F3E65793 /* SnippetExpander.swift */,
 				A0219177FA0CE615C8F89C6E /* SyncService.swift */,
+				591D844942C9F8658D075013 /* UpdateService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -250,6 +259,7 @@
 				51A21C8E2CDC291B4BDA5E20 /* SettingsWindowController.swift */,
 				B0A47DE33DC5AADDCBB0608F /* SnippetsSettingsView.swift */,
 				CF9A523F0099E8C1D92A5488 /* SyncSettingsView.swift */,
+				E86EC001E4BF79EEA7F13AC5 /* UpdatesSettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -294,6 +304,7 @@
 			packageProductDependencies = (
 				BD312F4F3D73DA48CCF5DCB9 /* SafeClipCore */,
 				E9D596B3E29E66FAB42C84D2 /* KeyboardShortcuts */,
+				29623AF187DA2CB2CA435B5C /* Sparkle */,
 			);
 			productName = SafeClip;
 			productReference = 1E23B201DB72D0FD608F7ED5 /* SafeClip.app */;
@@ -329,6 +340,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3ED9342A49A271A08254E5BC /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+				110707F55CA6B4CDF5151374 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				EA2C35DB4927AFCEC28E5009 /* XCLocalSwiftPackageReference "SafeClipCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -401,6 +413,8 @@
 				279ECC0B95F873E09B3B420A /* SnippetsSettingsView.swift in Sources */,
 				CE4500A408A4659ABED02DB5 /* SyncService.swift in Sources */,
 				803BE6AE402125FF1746912B /* SyncSettingsView.swift in Sources */,
+				8B1B388E951CEB0DF40D6621 /* UpdateService.swift in Sources */,
+				B1FC8B95A4DD6A1CE74067D0 /* UpdatesSettingsView.swift in Sources */,
 				41FBC5376511CF1F4EC1DF5D /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -440,6 +454,8 @@
 				4D58645374C5556A42FB4BC5 /* SnippetsSettingsView.swift in Sources */,
 				4A7EE5ABB080A1905DA89F47 /* SyncService.swift in Sources */,
 				05E9CFF9517FA70251ED2CF3 /* SyncSettingsView.swift in Sources */,
+				9EFCFB6CD482C928B390F1D3 /* UpdateService.swift in Sources */,
+				78E94D08A2E829BE9A85B6A8 /* UpdatesSettingsView.swift in Sources */,
 				653C559F94023F84B9875D21 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -462,6 +478,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				OTHER_SWIFT_FLAGS = "-DSPARKLE_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mudit.safeclip;
 				PRODUCT_NAME = SafeClip;
 				SDKROOT = macosx;
@@ -484,6 +501,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				OTHER_SWIFT_FLAGS = "-DSPARKLE_ENABLED";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mudit.safeclip;
 				PRODUCT_NAME = SafeClip;
 				SDKROOT = macosx;
@@ -704,6 +722,14 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		110707F55CA6B4CDF5151374 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
 		3ED9342A49A271A08254E5BC /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
@@ -715,6 +741,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		29623AF187DA2CB2CA435B5C /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 110707F55CA6B4CDF5151374 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
 		77298084AA8653A4B88C5AFF /* SafeClipCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SafeClipCore;

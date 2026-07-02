@@ -48,4 +48,15 @@ xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
 xcrun stapler staple "$DMG"
 
 shasum -a 256 "$DMG"
-echo "✅ $DMG ready — upload to GitHub Releases with the checksum above."
+
+echo "── signing for Sparkle appcast…"
+SIG_ATTRS=$(Scripts/sparkle_sign.swift "$DMG")
+echo "$SIG_ATTRS"
+
+echo "✅ $DMG ready — upload it to safeclip.app, then add an <item> to"
+echo "   appcast.xml (safeclip-web/public/appcast.xml) with:"
+echo "     <enclosure url=\"https://safeclip.app/downloads/SafeClip-$VERSION.dmg\""
+echo "       sparkle:version=\"\$(cat Config/Info.plist build number)\""
+echo "       sparkle:shortVersionString=\"$VERSION\""
+echo "       $SIG_ATTRS"
+echo "       type=\"application/octet-stream\" />"

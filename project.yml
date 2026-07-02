@@ -12,6 +12,12 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: "2.0.0"
+  # GitHub-channel updater (Session 15). MAS forbids self-updating apps, so
+  # this is deliberately only a dependency of the `SafeClip` target below,
+  # never `SafeClip-MAS`.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
 
 settings:
   base:
@@ -46,11 +52,14 @@ targets:
         CODE_SIGN_IDENTITY: "Apple Development"
         DEVELOPMENT_TEAM: YHK4D97KC4
         SWIFT_EMIT_LOC_STRINGS: NO
+        OTHER_SWIFT_FLAGS: "-DSPARKLE_ENABLED"
     dependencies:
       - package: SafeClipCore
         product: SafeClipCore
       - package: KeyboardShortcuts
         product: KeyboardShortcuts
+      - package: Sparkle
+        product: Sparkle
     scheme:
       testTargets: []
       environmentVariables:

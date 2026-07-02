@@ -82,3 +82,26 @@ What actually differs:
 
 `Scripts/release.sh` — needs `DEVELOPER_ID` + `NOTARY_PROFILE` env vars; does
 build → sign → notarize → staple → dmg + checksum.
+
+## Update checks (Session 15 — Sparkle, GitHub channel only)
+
+`SafeClip` (not `SafeClip-MAS` — Apple forbids self-updating MAS apps) embeds
+[Sparkle](https://sparkle-project.org) to check `https://safeclip.app/appcast.xml`
+for new versions. Off by default; the user opts in per-item (manual check) or
+via a Settings → Updates toggle (automatic, ~daily) — see `UpdateService.swift`
+and `PRIVACY.md` §4 for the disclosure.
+
+**Signing key:** an Ed25519 key pair lives in the login Keychain (service
+`com.mudit.safeclip.sparkle`, account `ed25519-private-key`), generated once
+with CryptoKit (no Sparkle CLI tools needed — same key format). The public
+half is baked into `Config/Info.plist` as `SUPublicEDKey`; the private half
+never leaves that Keychain entry and is only read by `Scripts/sparkle_sign.swift`.
+
+**Releasing an update:**
+1. Run `Scripts/release.sh` as usual (build → notarize → dmg) — it now also
+   runs `Scripts/sparkle_sign.swift` on the finished `.dmg` and prints the
+   `sparkle:edSignature`/`length` attributes.
+2. Upload the `.dmg` wherever `https://safeclip.app/downloads/` is served
+   from (the `safeclip-web` repo, `public/downloads/`).
+3. Add an `<item>` to `safeclip-web/public/appcast.xml` with those attributes
+   (a commented-out template is already in that file) and deploy the site.

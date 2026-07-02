@@ -1,16 +1,18 @@
 # SafeClip — Privacy Policy
 
-_Effective date: 14 June 2026. Applies to all versions of SafeClip._
+_Effective date: 2 July 2026 (updated for the update-check feature). Applies to all versions of SafeClip._
 
 ---
 
-Short version: **SafeClip collects nothing. All data stays on your device.**
+Short version: **SafeClip collects nothing. Your clipboard data never leaves your device.** The one exception is an optional update check, covered in §1 and §4 below.
 
 ---
 
 ## 1. Data we collect
 
-None. SafeClip is a local-only application. We collect no personal data, usage statistics, analytics, crash reports, or telemetry of any kind. No data ever leaves your Mac.
+None of your personal or clipboard data. SafeClip is a local-only application: no accounts, no usage statistics, no analytics, no crash reports, no telemetry of any kind. Your clipboard content never leaves your Mac.
+
+The one network request SafeClip can make is an **update check**: a request to `safeclip.app` asking "is there a version of SafeClip newer than mine." It contains no clipboard content, no personal data, and no device-identifying profile (SafeClip explicitly disables the update framework's optional system-profile reporting). This check never happens on its own unless you turn on "Automatically check for updates" in Settings → Updates; otherwise it only runs when you click "Check for Updates…" yourself. See §4.
 
 ---
 
@@ -42,11 +44,14 @@ SafeClip stores your clipboard history in an encrypted database on your Mac:
 
 ## 4. Third-party services
 
-SafeClip uses no third-party analytics, advertising, tracking, or cloud services. The app has no network functionality whatsoever.
+SafeClip uses no third-party analytics, advertising, tracking, or cloud services.
 
-Open-source dependencies (neither transmits any data):
+**Update checks (opt-in / manual):** SafeClip's only network functionality is checking `safeclip.app/appcast.xml` for a newer version, using the open-source [Sparkle](https://sparkle-project.org) framework. This is off by default and never runs on a schedule unless you enable "Automatically check for updates" in Settings → Updates; you can always trigger a one-off check yourself via "Check for Updates…" in the menu bar. The request carries no clipboard content and no device profile (system-profile reporting is disabled in SafeClip's configuration). If a newer version exists, you're shown release notes and choose whether to install; nothing installs silently. Each release is signed with a private key only Mudit holds, and SafeClip verifies that signature before installing anything it downloads.
+
+Open-source dependencies (none transmit clipboard data; Sparkle is the only one that makes network requests, and only for the update check described above):
 - **GRDB.swift** (MIT Licence) — local SQLite database
 - **KeyboardShortcuts** (MIT Licence) — global hotkey registration
+- **Sparkle** (MIT Licence) — update checking, GitHub-channel build only
 
 ---
 

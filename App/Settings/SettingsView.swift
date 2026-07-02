@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     let appState: AppState
     let syncService: SyncService
+    @ObservedObject var updateService: UpdateService
 
     var body: some View {
         TabView {
@@ -14,6 +15,8 @@ struct SettingsView: View {
                 .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
             PrivacySettingsView(appState: appState)
                 .tabItem { Label("Privacy", systemImage: "hand.raised") }
+            UpdatesSettingsView(updateService: updateService)
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
             AdvancedSettingsView(appState: appState)
                 .tabItem { Label("Advanced", systemImage: "wrench.and.screwdriver") }
             AboutView(appState: appState)

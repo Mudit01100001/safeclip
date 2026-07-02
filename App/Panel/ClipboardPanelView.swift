@@ -45,6 +45,16 @@ struct ClipboardPanelView: View {
                 shape.fill(.regularMaterial)
             }
         }
+        // Behind the glass: a just-above-threshold alpha fill that makes the
+        // callout a real mouse-event target. The window server derives a
+        // non-opaque window's clickable region from rendered alpha, and the
+        // Liquid Glass surface contributes almost none to the window's own
+        // backing — without this, scroll and clicks over the panel hit-test
+        // straight through to the window BEHIND it (SELFTEST 2 Jul 2026:
+        // 17/20 scrolls + 20/20 clicks routed to the window underneath).
+        // Shape-accurate, so the hit region and the window shadow both still
+        // match the visible callout exactly. ~0.05 is the documented cutoff.
+        .background { shape.fill(Color.black.opacity(0.06)) }
         .clipShape(shape)
         .onChange(of: model.focusEpoch, initial: true) {
             searchFocused = true

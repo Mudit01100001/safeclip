@@ -3,12 +3,14 @@ import SafeClipCore
 import SwiftUI
 
 /// NSPanel for the floating clipboard list. SafeClip is **activated** while the
-/// panel is open so the panel captures scroll-wheel and key events exclusively —
-/// a non-activating panel lets the wheel leak through to the app behind it (e.g.
-/// the editor underneath keeps scrolling). Focus is handed back to the app the
-/// user came from on dismiss (paste / Escape / toggle), so their own ⌘V still
-/// lands in their document. The list scrolls via a real `NSScrollView`
-/// (`NativeScrollView`).
+/// panel is open so the panel owns key events (search field, arrows); focus is
+/// handed back to the app the user came from on dismiss (paste / Escape /
+/// toggle), so their own ⌘V still lands in their document. Mouse routing is a
+/// separate concern entirely: the window server hit-tests a non-opaque window
+/// by its rendered alpha, so the callout is backed by a just-above-threshold
+/// fill (see ClipboardPanelView) — without it, scroll and clicks pass straight
+/// through to the window behind (the Session-13 bug). The list scrolls via a
+/// real `NSScrollView` (`NativeScrollView`).
 ///
 /// Borderless panels return `false` from `canBecomeKey` by default, so it's
 /// overridden here — without it the panel could never take the search field.
@@ -37,26 +39,31 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
     private let hostingView: ClickThroughHostingView<ClipboardPanelView>
     private var keyMonitor: Any?
     private var scrollMonitor: Any?
-    /// Global fallback for scroll — confirmed necessary by SELFTEST on 2 Jul
-    /// 2026 (missed_seen_elsewhere=7/7 misses, 0 lost entirely): most real
-    /// wheel events over the panel are routed by the window server to some
-    /// other destination instead of SafeClip's own dispatch, even while
-    /// panel.isKeyWindow/NSApp.isActive read true, so the LOCAL monitor above
-    /// never fires for them. A global monitor sees them anyway and can
-    /// manually forward — it can't consume, so the misdirected destination
-    /// still gets the event too, but a rare visible double-scroll beats
-    /// silently failing most of the time.
+    /// Global scroll fallback — pure regression insurance since the root-cause
+    /// fix (the callout's hit-backing fill in ClipboardPanelView). With that
+    /// fill, wheel events over the panel arrive through the local monitor and
+    /// this one never fires for them (SELFTEST 2 Jul 2026: misrouted_dst
+    /// empty, scroll 20/20). If a future macOS change re-breaks
+    /// transparent-window hit-testing (26.3 RC and the 26.4 beta both did),
+    /// this forwards the misrouted events so scroll degrades to "works, with a
+    /// possible echo in the app behind" instead of going silently dead — and
+    /// SELFTEST's misrouted_dst names the destination again.
     private var globalScrollMonitor: Any?
     /// Global monitor — sees mouse-down events destined for *other* apps'
     /// windows (local monitors can't). Closes the panel on any such click
     /// without consuming it, so the click still reaches its real target.
     /// Covers cases `windowDidResignKey` misses, like clicking the Finder
-    /// desktop, which doesn't make any window key.
+    /// desktop, which doesn't make any window key. Clicks *inside* the panel
+    /// frame are ignored here, never treated as a dismiss: with the
+    /// hit-backing fill they arrive locally, and if hit-testing ever
+    /// regresses, closing the panel on its own misrouted clicks was exactly
+    /// the Session-13 bug.
     private var outsideClickMonitor: Any?
-    /// The app that was frontmost when the panel opened. The non-activating panel
-    /// doesn't steal activation, so normal dismissal needs no restore — but a
-    /// ClickFix confirmation modal *does* activate SafeClip, so we hand focus back
-    /// to this app afterward, keeping the user's ⌘V landing in their document.
+    /// The app that was frontmost when the panel opened. Showing the panel
+    /// activates SafeClip (for keys/search), so every deliberate dismissal
+    /// path (Escape / paste / toggle) hands focus back to this app, keeping
+    /// the user's ⌘V landing in their document. Click-outside dismissal
+    /// doesn't restore — the user's own click already chose the next target.
     private weak var previousApp: NSRunningApplication?
     #if DEBUG
     /// Logs only the first real wheel event forwarded per show(), so a single
@@ -83,11 +90,17 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
     /// our OWN "click outside closes the panel" feature is the reason a
     /// synthetic click never reached the row (self-inflicted, not a hitbox bug).
     private var outsideClickFiredThisIteration = false
-    /// Set when outsideClickMonitor decided a misrouted click was actually
-    /// inside our own frame and replayed it via panel.sendEvent(_:) instead of
-    /// dismissing — tells SELFTEST whether that replay path actually ran (as
-    /// opposed to the click registering via ordinary local delivery).
-    private var clickReplayedThisIteration = false
+    /// Set when outsideClickMonitor observed a click that the window server
+    /// routed to another app even though the pointer was inside our own frame —
+    /// i.e. the Session-13 misrouting is back. Stays false on every iteration
+    /// now that the hit-backing fill exists (SELFTEST 2 Jul 2026).
+    private var clickMisroutedThisIteration = false
+    /// windowNumber → count for events the window server routed to some OTHER
+    /// destination while the pointer was inside the panel's frame (observed by
+    /// the global monitors, which only ever see events bound for other apps).
+    /// SELFTEST resolves these to owning apps — this names the misrouted
+    /// events' actual destination instead of leaving it a guess.
+    private var misroutedWindowCounts: [Int: Int] = [:]
     #endif
 
     /// The largest the window ever gets (created at this size, shrunk per show).
@@ -128,6 +141,11 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
         panel.isMovableByWindowBackground = true
+        // .clear is safe ONLY because ClipboardPanelView fills the callout
+        // shape with a just-above-threshold alpha backing (see the comment on
+        // that fill). A window whose pixels are fully transparent is invisible
+        // to the window server's mouse hit-testing — scroll/clicks route
+        // straight through to the window behind (SELFTEST 2 Jul 2026).
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
@@ -303,9 +321,9 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
             var clickPointMissing = 0
             var clickSelfClosed = 0    // our own outsideClickMonitor hid the panel
             var clickPanelClosedOther = 0  // panel closed for some other reason
-            var clickReplayed = 0      // click was misrouted but replayed via sendEvent
-            var clickReplayedButMissed = 0  // replayed, panel stayed open, still no paste
+            var clickMisrouted = 0  // window server routed a click over the panel elsewhere
             var byDelay: [Double: (hit: Int, total: Int)] = [:]
+            misroutedWindowCounts = [:]
 
             for i in 0..<iterations {
                 let delay = delays[i % delays.count]
@@ -341,15 +359,12 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
 
                 var clickOK = false
                 outsideClickFiredThisIteration = false
-                clickReplayedThisIteration = false
+                clickMisroutedThisIteration = false
                 if let point = screenPointNearListTop() {
                     postSyntheticClick(at: point)
                     try? await Task.sleep(nanoseconds: 60_000_000)
                     clickOK = model.justCopiedID != nil
-                    if clickReplayedThisIteration {
-                        clickReplayed += 1
-                        if !clickOK { clickReplayedButMissed += 1 }
-                    }
+                    if clickMisroutedThisIteration { clickMisrouted += 1 }
                     if !clickOK, !panel.isVisible {
                         if outsideClickFiredThisIteration { clickSelfClosed += 1 } else { clickPanelClosedOther += 1 }
                     }
@@ -372,13 +387,21 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
                 let b = byDelay[d] ?? (hit: 0, total: 0)
                 return "\(d):\(b.hit)/\(b.total)"
             }.joined(separator: ",")
+            // Name the misrouted events' actual destinations: which window did
+            // the window server hand them to instead of us? (windowNumber on a
+            // global-monitor event is the server's chosen destination window.)
+            let destStr = misroutedWindowCounts
+                .sorted { $0.value > $1.value }
+                .map { "\(Self.windowOwnerName($0.key))#\($0.key):\($0.value)" }
+                .joined(separator: ",")
             let report = "SELFTEST n=\(iterations) scroll=\(scrollHits)/\(iterations)"
                 + " fwd_missed=\(fwdMissed) fwd_no_move=\(fwdNoMove)"
                 + " missed_seen_elsewhere=\(missedButSeenElsewhere) missed_seen_nowhere=\(missedAndSeenNowhere)"
                 + " click=\(clickHits)/\(iterations) click_point_missing=\(clickPointMissing)"
                 + " click_self_closed=\(clickSelfClosed) click_panel_closed_other=\(clickPanelClosedOther)"
-                + " click_replayed=\(clickReplayed) click_replayed_but_missed=\(clickReplayedButMissed)"
+                + " click_misrouted=\(clickMisrouted)"
                 + " by_delay{\(byDelayStr)}"
+                + " panel_win=\(panel.windowNumber) misrouted_dst{\(destStr)}"
             NSLog(report)
             try? report.write(toFile: "/tmp/safeclip-selftest.txt", atomically: true, encoding: .utf8)
 
@@ -425,6 +448,19 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         ) else { return }
         scrollEvent.location = point
         scrollEvent.post(tap: .cghidEventTap)
+    }
+
+    /// Resolves a window number to its owning app's name via the window list.
+    /// "none" = the event carried no destination window at all; "gone" = the
+    /// window vanished before the report was written. Diagnostic-only.
+    private static func windowOwnerName(_ windowNumber: Int) -> String {
+        guard windowNumber > 0 else { return "none" }
+        guard let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(windowNumber))
+                as? [[String: Any]],
+              let owner = list.first?[kCGWindowOwnerName as String] as? String else {
+            return "gone"
+        }
+        return owner.replacingOccurrences(of: " ", with: "_")
     }
 
     private func postSyntheticClick(at point: CGPoint) {
@@ -544,10 +580,11 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         panel.setFrame(frame, display: false)
     }
 
-    /// Hides the panel. Because the panel is non-activating it never took focus
-    /// from the user's app, so ordering it out is enough — key returns to the
-    /// app the user was in and their ⌘V lands there. (Focus is only restored
-    /// explicitly after a confirmation modal, which *does* activate SafeClip.)
+    /// Hides the panel. Showing activated SafeClip, so callers on deliberate
+    /// dismissal paths (Escape / paste / toggle) follow this with
+    /// restoreFocus(to:) to hand activation back to the user's app. The
+    /// click-outside path deliberately doesn't — the user's own click already
+    /// chose the next focus target.
     func hide() {
         guard panel.isVisible else { return }
         removeKeyMonitor()
@@ -587,20 +624,18 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
             let handled = MainActor.assumeIsolated { self.forwardScroll(event) }
             return handled ? nil : event
         }
-        // Fallback: SELFTEST (2 Jul 2026) proved most real wheel events over
-        // the panel never reach the local monitor above at all — the window
-        // server routes them elsewhere despite panel.isKeyWindow/NSApp.isActive
-        // reading true. A global monitor sees those misrouted events and can
-        // still manually forward them. It can't consume, so whatever the OS
-        // picked as the real destination still gets the event too (a rare
-        // visible double-scroll), but that beats scroll silently failing most
-        // of the time, which is what shipped before this fix.
+        // Regression insurance only (see the property doc): with the callout's
+        // hit-backing fill, wheel events over the panel arrive via the local
+        // monitor above and this one never fires for them. If macOS ever
+        // re-breaks transparent-window hit-testing, this keeps scroll alive
+        // (forwarded, with a possible echo in the app behind) instead of dead.
         globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self else { return }
             MainActor.assumeIsolated {
                 #if DEBUG
                 if self.panel.isVisible, self.panel.frame.contains(NSEvent.mouseLocation) {
                     self.globalScrollSeenThisIteration = true
+                    self.misroutedWindowCounts[event.windowNumber, default: 0] += 1
                 }
                 #endif
                 _ = self.forwardScroll(event)
@@ -613,24 +648,22 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         // so never fire windowDidResignKey. Doesn't consume the event, so the
         // user's click still reaches and activates its real target normally.
         //
-        // BUT: SELFTEST proved (click_self_closed=10/10, 2 Jul 2026) that the
-        // exact same misrouting that breaks scroll also misroutes clicks
-        // meant for our OWN panel — a global monitor can't tell "click on the
-        // Finder desktop" apart from "click on our own row that the window
-        // server misdelivered," so it was slamming the panel shut on its own
-        // clicks before the row's tap gesture ever fired. Fix: check location
-        // first. Inside our frame → replay the event into our own window via
-        // sendEvent so the row still gets it (this is what makes the
-        // misrouted click actually register at all, not just avoid closing);
-        // outside → the original dismiss behavior.
+        // A click INSIDE our frame showing up here means the window server
+        // misrouted it — the Session-13 bug, root-caused to the fully
+        // transparent window and fixed by the hit-backing fill. Never treat it
+        // as "outside": slamming the panel shut on its own clicks was the bug.
+        // Just count it so SELFTEST flags any regression. (An earlier attempt
+        // to replay such clicks via panel.sendEvent was doubly broken — a
+        // global event's locationInWindow is in *screen* coordinates, and the
+        // matching mouse-up never arrives, so a tap could never complete.)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self else { return }
             MainActor.assumeIsolated {
                 if self.panel.isVisible, self.panel.frame.contains(NSEvent.mouseLocation) {
                     #if DEBUG
-                    self.clickReplayedThisIteration = true
+                    self.clickMisroutedThisIteration = true
+                    self.misroutedWindowCounts[event.windowNumber, default: 0] += 1
                     #endif
-                    self.panel.sendEvent(event)
                     return
                 }
                 #if DEBUG
@@ -740,7 +773,6 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         }
         // Hand activation back to the app the user came from BEFORE they ⌘V, so
         // their paste lands in the field they were editing without re-clicking it.
-        // (Belt-and-braces on top of the non-activating panel.)
         restoreFocus(to: target)
         appState.paste(item, optionHeld: optionHeld)
         // The user presses ⌘V themselves — by design (PRD §8.1).

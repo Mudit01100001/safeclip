@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import SafeClipCore
 
 /// Auto-expand snippets (#11): watches typed characters globally and, when the
@@ -55,6 +56,15 @@ final class SnippetExpander {
     }
 
     private func handleKey(_ event: NSEvent) {
+        // Defense-in-depth: macOS already withholds keyDown from global
+        // monitors while Secure Keyboard Entry is active (password fields),
+        // but that's observed behavior, not an API contract. Never buffer or
+        // match while it's on — and drop any half-typed trigger, so nothing
+        // typed before the secure field can combine with what follows it.
+        if IsSecureEventInputEnabled() {
+            buffer = ""
+            return
+        }
         guard !expanding else { return }
         // Never re-process the keystrokes we synthesize.
         if event.cgEvent?.getIntegerValueField(.eventSourceUserData) == Self.syntheticTag { return }

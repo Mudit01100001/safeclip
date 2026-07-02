@@ -239,6 +239,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// through the panel, which warns first.
     private func quickPaste(slot: Int) {
         guard let state = appState else { return }
+        // Same guard the panel's paste paths apply (performPaste): while
+        // history is hidden (screen recording / Privacy Mode) the user can't
+        // see what a slot holds, so never place it blind or preview it in a
+        // toast. Without this, ⌃⌘1..0 quietly bypassed the privacy mode.
+        if state.historyHidden {
+            menuBar?.showToast(
+                symbol: "eye.slash",
+                tint: .secondary,
+                title: "Hidden while screen recording",
+                snippet: nil
+            )
+            return
+        }
         let clips = state.clips
         guard clips.indices.contains(slot) else {
             menuBar?.showToast(

@@ -162,9 +162,14 @@ struct ClipboardPanelView: View {
                 // Blur, don't blank: keep the shape of the list so the panel
                 // still reads as itself on a screen share, but no content is
                 // legible. Interaction is off so nothing can be pasted blind.
+                // The rows are ALSO masked at the source (privacyHidden on
+                // each row view) — the blur is cosmetic, not the protection —
+                // and the subtree is dropped from the accessibility tree so
+                // an a11y client can't read what the eyes can't.
                 activeList
                     .blur(radius: 10)
                     .allowsHitTesting(false)
+                    .accessibilityHidden(true)
                     .overlay(alignment: .bottom) {
                         Label(
                             "Hidden while screen recording",
@@ -224,7 +229,8 @@ struct ClipboardPanelView: View {
                     SnippetRowView(
                         snippet: snippet,
                         isSelected: index == model.selectedSnippetIndex,
-                        isJustCopied: model.justCopiedID == snippet.id
+                        isJustCopied: model.justCopiedID == snippet.id,
+                        privacyHidden: model.historyHidden
                     )
                         .id(snippet.id)
                         .reportsSelectedRowFrame(index == model.selectedSnippetIndex, into: $selectedRowFrame)
@@ -256,7 +262,8 @@ struct ClipboardPanelView: View {
                         masked: item.isConcealed && model.maskConcealed,
                         multiOrder: model.multiOrder(of: item),
                         isJustCopied: model.justCopiedID == item.id,
-                        onCopyText: { model.copyImageText(item) }
+                        onCopyText: { model.copyImageText(item) },
+                        privacyHidden: model.historyHidden
                     )
                     .id(item.id)
                     .reportsSelectedRowFrame(index == model.selectedIndex, into: $selectedRowFrame)
@@ -409,6 +416,12 @@ struct ClipRowView: View {
     var isJustCopied: Bool = false
     /// Copies the text recognized inside an image clip (hover action).
     var onCopyText: (() -> Void)? = nil
+    /// True while history is hidden (screen recording / Privacy Mode). Masks
+    /// the row's text at the SOURCE with no hover reveal — the blur alone
+    /// isn't enough, because the real string would still sit in the view/
+    /// accessibility tree (and these rows render inside a native
+    /// NSHostingView, which outer SwiftUI redaction doesn't reach).
+    var privacyHidden: Bool = false
     /// Concealed rows mask their preview at rest but reveal while hovered, so
     /// the list stays unreadable at a glance yet any item can be checked on
     /// demand. (Many apps over-apply `org.nspasteboard.ConcealedType` — e.g.
@@ -416,7 +429,7 @@ struct ClipRowView: View {
     @State private var hovering = false
     @State private var copiedText = false
 
-    private var isMasked: Bool { masked && !hovering }
+    private var isMasked: Bool { privacyHidden || (masked && !hovering) }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -601,6 +614,9 @@ struct ClipRowView: View {
     }
 
     private var helpText: String {
+        // No tooltips while history is hidden — a tooltip renders in its own
+        // window, outside the blurred (and capture-excluded) panel.
+        if privacyHidden { return "" }
         var lines: [String] = []
         if let reason = item.flagReason { lines.append(reason.displayName) }
         if item.isBurn {
@@ -626,6 +642,9 @@ struct SnippetRowView: View {
     let snippet: Snippet
     let isSelected: Bool
     var isJustCopied: Bool = false
+    /// Masks label/body at the source while history is hidden (screen
+    /// recording / Privacy Mode) — same reasoning as ClipRowView.privacyHidden.
+    var privacyHidden: Bool = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -634,10 +653,12 @@ struct SnippetRowView: View {
                 .foregroundStyle(.tint)
                 .frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
-                Text(snippet.label.isEmpty ? snippet.bodyPreview : snippet.label)
+                Text(privacyHidden
+                    ? "••••••••••••"
+                    : (snippet.label.isEmpty ? snippet.bodyPreview : snippet.label))
                     .font(.body)
                     .lineLimit(1)
-                if !snippet.label.isEmpty, !snippet.bodyPreview.isEmpty {
+                if !privacyHidden, !snippet.label.isEmpty, !snippet.bodyPreview.isEmpty {
                     Text(snippet.bodyPreview)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -665,7 +686,7 @@ struct SnippetRowView: View {
         .scaleEffect(isJustCopied ? 0.97 : 1)
         .animation(.spring(response: 0.18, dampingFraction: 0.5), value: isJustCopied)
         .contentShape(Rectangle())
-        .help(snippet.label.isEmpty ? snippet.bodyPreview : snippet.label)
+        .help(privacyHidden ? "" : (snippet.label.isEmpty ? snippet.bodyPreview : snippet.label))
     }
 
     private var snippetRowBackground: AnyShapeStyle {

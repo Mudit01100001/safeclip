@@ -86,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pickColor: { [weak self] in self?.pickColor() },
                 openSettings: { [weak self] in self?.settingsController?.open() },
                 checkForUpdates: { [weak self] in self?.updateService.checkForUpdates() },
+                sendFeedback: { Feedback.compose() },
                 clearAll: { [weak state] in state?.clearAll() },
                 quit: { NSApp.terminate(nil) }
             )

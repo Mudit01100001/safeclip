@@ -306,11 +306,11 @@ struct OnboardingView: View {
     private var illustration: some View {
         Group {
             switch page {
-            case 0: panelMock
-            case 1: pasteMock
-            case 2: shortcutMock
-            case 3: privacyMock
-            case 4: permissionsMock
+            case 0: OnboardingVideo(resourceName: "onboarding-0-welcome") { panelMock }
+            case 1: OnboardingVideo(resourceName: "onboarding-1-plaintext") { pasteMock }
+            case 2: OnboardingVideo(resourceName: "onboarding-2-shortcuts") { shortcutMock }
+            case 3: OnboardingVideo(resourceName: "onboarding-3-privacy") { privacyMock }
+            case 4: OnboardingVideo(resourceName: "onboarding-4-permissions") { permissionsMock }
             default: termsMock
             }
         }

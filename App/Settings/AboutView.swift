@@ -22,7 +22,10 @@ struct AboutView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 380)
 
-            Button("Show Onboarding Again") { appState.replayOnboarding() }
+            HStack(spacing: 12) {
+                Button("Show Onboarding Again") { appState.replayOnboarding() }
+                Button("Send Feedback…") { Feedback.compose() }
+            }
 
             Divider().frame(width: 320)
 

@@ -13,6 +13,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         var pickColor: () -> Void
         var openSettings: () -> Void
         var checkForUpdates: () -> Void
+        var sendFeedback: () -> Void
         var clearAll: () -> Void
         var quit: () -> Void
     }
@@ -97,6 +98,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let checkUpdates = makeItem("Check for Updates…", #selector(checkForUpdatesAction))
         checkUpdates.isEnabled = UpdateService.isSupported
         menu.addItem(checkUpdates)
+        menu.addItem(makeItem("Send Feedback…", #selector(sendFeedbackAction)))
         menu.addItem(makeItem("About SafeClip", #selector(openAbout)))
         menu.addItem(.separator())
         let quit = makeItem("Quit SafeClip", #selector(quit))
@@ -281,6 +283,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func openSettings() { actions.openSettings() }
 
     @objc private func checkForUpdatesAction() { actions.checkForUpdates() }
+
+    @objc private func sendFeedbackAction() { actions.sendFeedback() }
 
     @objc private func clearAll() {
         let alert = NSAlert()

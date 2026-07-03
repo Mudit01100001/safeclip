@@ -41,6 +41,9 @@ targets:
         buildPhase: resources
       - path: PRIVACY.md
         buildPhase: resources
+      - path: App/OnboardingVideos
+        buildPhase: resources
+        optional: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip
@@ -80,6 +83,9 @@ targets:
         buildPhase: resources
       - path: PRIVACY.md
         buildPhase: resources
+      - path: App/OnboardingVideos
+        buildPhase: resources
+        optional: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mudit.safeclip

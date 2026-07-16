@@ -35,7 +35,7 @@ _Last updated: 16 June 2026 (Session 6 — opt-in caret-anchored panel). Distrib
 | Live security smoke test | ✅ encrypted-on-disk, keychain key, dedup, relaunch persistence |
 | Git repo + GitHub remote | ✅ [Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip) |
 | CI | ✅ `.github/workflows/ci.yml` — tests + zero-warning gate |
-| Notarized release | ⏳ blocked on Developer ID cert (`Scripts/release.sh` ready) |
+| Notarized release | ✅ **Shipped 15 Jul** — `SafeClip-0.2.1.dmg`, notarization Accepted + stapled + Sparkle-signed. Not yet distributed (no live domain to host it on yet). |
 | Interactive UI QA | ⏳ needs a human at the keyboard |
 
 **Milestone status:** M0 ✅ · M1 ✅ · M2 ✅ (code; interactive QA pending) · M3 ✅ except notarization · M4 ✅ (screen-record detection is heuristic — see R12) · M5 ✅ · **v0.2.0 ✅** images + file copies + Liquid Glass (R13) · **Session 5 ✅** screen-region OCR (⌥C) + shortcut remap (⌥V) + classifier fix (R15), 43 tests, OCR live-verified on macOS 26.5 · **Session 6 ✅** opt-in caret-anchored panel + callout arrow (R16), zero-warning build, 43 tests (interactive QA pending)
@@ -542,7 +542,7 @@ These require a decision before the tagged milestone.
 | D3 | **App name trademark check** | release | "SafeClip" (working title) | Check macOS App Store + USPTO before committing |
 | ~~D4~~ | ~~Paid vs. free binary~~ | — | — | **Resolved (Session 5): paid `.dmg` on Mudit's website via a payment gateway; MIT source stays public.** Open: price + which gateway |
 | D5 | **Launch timing** | release | Align with macOS 16 GA (fall 2026) | Aim for maximum narrative tailwind |
-| D6 | **Developer ID certificate** | release | Personal ($99/yr Apple Developer Program) | Required for notarization — only remaining release blocker |
+| ~~D6~~ | ~~**Developer ID certificate**~~ | — | — | **Resolved 15 Jul:** cert created, notarytool credentials stored, first real notarized `.dmg` (0.2.1) produced successfully. Two release-script bugs found and fixed along the way (`build`→`archive`/`exportArchive` to drop the get-task-allow entitlement; explicit re-sign pass for Sparkle's nested helper binaries). |
 | D7 | **Accessibility permission for core panel scroll/click reliability** | next scroll/click fix attempt | (a) Request Accessibility by default to enable a `CGEventTap` that can consume misrouted input; (b) accept scroll (~25% leak to the app behind) and click (can still close panel without pasting) as "mostly works" indefinitely | Session 13: root-caused both to genuine OS-level input misrouting to the `.accessory` window; `NSEvent` global monitors can observe but never consume, so this is the architectural ceiling, not a bug to keep patching. See R17. |
 
 ---

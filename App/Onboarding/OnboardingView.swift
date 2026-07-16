@@ -192,6 +192,15 @@ struct OnboardingView: View {
                 granted: CGPreflightScreenCaptureAccess(),
                 action: { CGRequestScreenCaptureAccess() }
             )
+            Divider()
+            // macOS only shows the system prompt once per permission — if it was
+            // dismissed or denied, tapping Enable again silently does nothing, so
+            // this is the only way back in. Kept visible (not just on denial) so
+            // it's here to refer back to via Settings → About → Show Onboarding Again.
+            Text("If **Enable** doesn't show a prompt, macOS already asked once. Open **System Settings → Privacy & Security**, choose **Accessibility** or **Screen Recording**, and turn the toggle on for SafeClip.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -59,8 +59,19 @@ enum ScreenOCRService {
         await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-            // -i interactive, -x silent (no shutter sound), -t png.
-            process.arguments = ["-i", "-x", "-t", "png", url.path]
+            // -i interactive, -s force mouse-selection (rectangle) mode, -x silent
+            // (no shutter sound), -t png.
+            //
+            // -s is load-bearing: without it, `-i` inherits the user's saved
+            // `com.apple.screencapture` `style` preference. If that is `window`
+            // (or `video`), macOS 26's capture UI starts the interactive session
+            // in window/video mode, and when the user drags a rectangle instead
+            // it cancels that session — surfacing a spurious "Capture Canceled"
+            // system HUD (the rectangle screenshot is still saved, so OCR works,
+            // but the HUD fires every time). -s pins selection-only mode, which
+            // is exactly the region-drag UX this feature wants, and removes the
+            // HUD by never opening a window/video session in the first place.
+            process.arguments = ["-i", "-s", "-x", "-t", "png", url.path]
             process.terminationHandler = { proc in
                 continuation.resume(returning: proc.terminationStatus == 0)
             }

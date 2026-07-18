@@ -57,8 +57,12 @@ final class ScreenColorPicker {
         guard Self.isSupported else { return fallBackToSystemSampler() }
         // First-ever use: trigger the Screen Recording prompt for next time and
         // use the system sampler now (the SCK grant often needs a relaunch).
+        // Also explain, once, why the custom loupe didn't appear — otherwise the
+        // fallback is silent and the user has no idea a nicer picker exists or
+        // how to enable it (they just see the plain system magnifier).
         guard CGPreflightScreenCaptureAccess() else {
             CGRequestScreenCaptureAccess()
+            explainLoupeFallbackOnce()
             return fallBackToSystemSampler()
         }
 
@@ -117,6 +121,36 @@ final class ScreenColorPicker {
     private func fallBackToSystemSampler() {
         NSColorSampler().show { [weak self] color in
             MainActor.assumeIsolated { self?.finish(color) }
+        }
+    }
+
+    /// Shown at most once (persisted in `UserDefaults`) the first time the custom
+    /// loupe can't run for lack of Screen Recording permission — so the fallback
+    /// to the plain system picker isn't a silent mystery. Offers a jump straight
+    /// to the right System Settings pane; deliberately never nags again after.
+    private func explainLoupeFallbackOnce() {
+        let key = "screenRecordingLoupeExplained"
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: key) else { return }
+        defaults.set(true, forKey: key)
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Using the basic color picker for now"
+        alert.informativeText = """
+            SafeClip's magnifier loupe reads screen pixels, which needs Screen \
+            Recording permission. Until that's granted, the basic macOS color \
+            picker is used instead.
+
+            To turn on the loupe: System Settings > Privacy & Security > Screen \
+            Recording > enable SafeClip, then quit and reopen SafeClip.
+            """
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Not Now")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
         }
     }
 

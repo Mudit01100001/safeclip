@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.1</string>
+	<string>0.2.2</string>
 	<key>CFBundleVersion</key>
-	<string>3</string>
+	<string>4</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -37,7 +37,7 @@
 	weight there, not a live capability.
 	-->
 	<key>SUFeedURL</key>
-	<string>https://safeclip.app/appcast.xml</string>
+	<string>https://safeclip-web-git-beta-mudit-s-projects3.vercel.app/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>Ia6I178YCzQ/93pQIZkRNtglwY0Yvudj6npzrX/lthM=</string>
 	<!-- Off by default: the app makes no network call until the user either

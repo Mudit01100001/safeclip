@@ -35,7 +35,7 @@ _Last updated: 16 June 2026 (Session 6 — opt-in caret-anchored panel). Distrib
 | Live security smoke test | ✅ encrypted-on-disk, keychain key, dedup, relaunch persistence |
 | Git repo + GitHub remote | ✅ [Mudit01100001/safeclip](https://github.com/Mudit01100001/safeclip) |
 | CI | ✅ `.github/workflows/ci.yml` — tests + zero-warning gate |
-| Notarized release | ✅ **Shipped 15 Jul** — `SafeClip-0.2.1.dmg`, notarization Accepted + stapled + Sparkle-signed. Not yet distributed (no live domain to host it on yet). |
+| Notarized release | ✅ **0.2.2 shipped 18 Jul AND LIVE** — `SafeClip-0.2.2.dmg` (build 4), notarization Accepted + stapled + Sparkle-signed, served from the beta site (`safeclip-web-git-beta-…vercel.app/downloads/`), first real appcast `<item>` published, Ed25519 signature verified against the live feed. Caveat: the earlier 0.2.1's `SUFeedURL` pointed at the unregistered `safeclip.app`, so 0.2.1 installs can never self-update (only affected the owner's machine; replaced manually). |
 | Interactive UI QA | ⏳ needs a human at the keyboard |
 
 **Milestone status:** M0 ✅ · M1 ✅ · M2 ✅ (code; interactive QA pending) · M3 ✅ except notarization · M4 ✅ (screen-record detection is heuristic — see R12) · M5 ✅ · **v0.2.0 ✅** images + file copies + Liquid Glass (R13) · **Session 5 ✅** screen-region OCR (⌥C) + shortcut remap (⌥V) + classifier fix (R15), 43 tests, OCR live-verified on macOS 26.5 · **Session 6 ✅** opt-in caret-anchored panel + callout arrow (R16), zero-warning build, 43 tests (interactive QA pending)

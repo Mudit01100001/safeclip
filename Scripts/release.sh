@@ -75,12 +75,62 @@ echo "── verifying signature + hardened runtime…"
 codesign --verify --strict --deep "$APP"
 codesign -d --entitlements - "$APP" 2>/dev/null | head -5
 
-echo "── packaging dmg…"
+echo "── packaging styled dmg…"
+# Build a read-write dmg first so Finder can lay out the icon view (app on the
+# left, Applications alias on the right) over a custom background, then convert
+# it to the compressed read-only UDZO that ships. The background PNG is
+# committed (Scripts/assets/dmg-background@2x.png); regenerate it with
+# Scripts/dmg_background.swift if you change the window geometry below — the icon
+# centres and window content size MUST stay in lockstep with that script.
 STAGING=$(mktemp -d)
 cp -R "$APP" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
-hdiutil create -volname "SafeClip $VERSION" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+mkdir "$STAGING/.background"
+cp Scripts/assets/dmg-background@2x.png "$STAGING/.background/background.png"
+
+VOLNAME="SafeClip $VERSION"
+RW_DMG="$DIST/SafeClip-rw.dmg"
+rm -f "$RW_DMG"
+hdiutil create -volname "$VOLNAME" -srcfolder "$STAGING" -fs HFS+ \
+  -format UDRW -ov "$RW_DMG"
 rm -rf "$STAGING"
+
+DEVICE=$(hdiutil attach -readwrite -noverify -noautoopen "$RW_DMG" \
+  | grep -E '^/dev/' | head -1 | awk '{print $1}')
+sleep 2  # let Finder mount before scripting it
+
+# NOTE (owner machine, one-time): the first run of this Finder step triggers a
+# "Terminal wants to control Finder" Automation consent prompt — allow it.
+# Window chrome height isn't scriptable-exact; if the background doesn't sit
+# flush on the first styled release, nudge the window height in `bounds` below
+# (and Scripts/dmg_background.swift's H) and re-run.
+osascript <<APPLESCRIPT
+tell application "Finder"
+  tell disk "$VOLNAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {200, 120, 840, 548}
+    set viewOptions to the icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 128
+    set text size of viewOptions to 12
+    set background picture of viewOptions to file ".background:background.png"
+    set position of item "SafeClip.app" of container window to {160, 200}
+    set position of item "Applications" of container window to {480, 200}
+    update without registering applications
+    delay 1
+    close
+  end tell
+end tell
+APPLESCRIPT
+
+sync  # flush the .DS_Store layout to the image before detaching
+hdiutil detach "$DEVICE"
+rm -f "$DMG"
+hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG"
+rm -f "$RW_DMG"
 codesign --sign "$DEVELOPER_ID" --timestamp "$DMG"
 
 echo "── notarizing (this waits for Apple)…"

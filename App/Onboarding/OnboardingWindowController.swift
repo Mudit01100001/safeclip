@@ -8,7 +8,13 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private var completion: ((_ result: OnboardingResult) -> Void)?
     private var finished = false
 
-    convenience init(appState: AppState, completion: @escaping (_ result: OnboardingResult) -> Void) {
+    convenience init(
+        appState: AppState,
+        initialConsent: OnboardingResult = OnboardingResult(
+            acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false
+        ),
+        completion: @escaping (_ result: OnboardingResult) -> Void
+    ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
             styleMask: [.titled, .closable, .fullSizeContentView],
@@ -27,7 +33,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         self.completion = completion
         window.delegate = self
         window.contentView = NSHostingView(
-            rootView: OnboardingView(appState: appState) { [weak self] result in
+            rootView: OnboardingView(appState: appState, initialConsent: initialConsent) { [weak self] result in
                 self?.finish(result: result)
             }
         )

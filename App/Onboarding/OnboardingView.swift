@@ -28,6 +28,29 @@ struct OnboardingView: View {
     @State private var marketingAccepted = false
     @State private var showingTerms = false
     @State private var showingPrivacy = false
+    // Live permission status, re-read whenever the window regains focus so the
+    // rows flip to a green check the moment the user grants access in System
+    // Settings (which happens in another process, out of SwiftUI's sight).
+    @State private var accessibilityGranted = false
+    @State private var screenRecordingGranted = false
+
+    /// `initialConsent` pre-checks the Terms/Privacy boxes when onboarding is
+    /// *replayed* for someone who already accepted (a version-bump re-show or the
+    /// Settings → About replay), so they aren't forced to re-consent. First-run
+    /// passes all-false, keeping DPDP §6's unchecked-by-default rule.
+    init(
+        appState: AppState,
+        initialConsent: OnboardingResult = OnboardingResult(
+            acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false
+        ),
+        onFinish: @escaping (_ result: OnboardingResult) -> Void
+    ) {
+        self.appState = appState
+        self.onFinish = onFinish
+        _termsAccepted = State(initialValue: initialConsent.acceptedTerms)
+        _privacyAccepted = State(initialValue: initialConsent.acceptedPrivacy)
+        _marketingAccepted = State(initialValue: initialConsent.acceptedMarketing)
+    }
 
     private static let stepCount = 6
     private var isLast: Bool { page == Self.stepCount - 1 }
@@ -57,12 +80,24 @@ struct OnboardingView: View {
         // content's unbounded ideal height and the card stretches absurdly tall.
         .frame(width: 620, height: 640)
         .preferredColorScheme(.dark)
+        .onAppear(perform: refreshPermissions)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshPermissions()
+        }
         .sheet(isPresented: $showingTerms) {
             LegalDocumentSheet(resourceName: "TERMS", title: "Terms of Use")
         }
         .sheet(isPresented: $showingPrivacy) {
             LegalDocumentSheet(resourceName: "PRIVACY", title: "Privacy Policy")
         }
+    }
+
+    /// Re-reads the OS permission state. Called on appear and whenever the app
+    /// becomes active again (e.g. returning from System Settings), so a grant
+    /// made outside the app is reflected without a relaunch.
+    private func refreshPermissions() {
+        accessibilityGranted = CaretLocator.isSupported ? CaretLocator.isTrusted : true
+        screenRecordingGranted = CGPreflightScreenCaptureAccess()
     }
 
     private var background: some View {
@@ -175,29 +210,31 @@ struct OnboardingView: View {
 
     private var permissionsControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            caption("SafeClip launches needing nothing. These are optional and only used for the feature named — explained here before macOS asks.")
+            caption("Set these up now so every feature just works — no surprise system prompts later. Each is optional and used only for the feature named.")
             if CaretLocator.isSupported {
                 permissionRow(
-                    "text.cursor",
-                    "Accessibility",
-                    "Only to read the text cursor's position so the panel can open there. Never your keystrokes or text.",
-                    granted: CaretLocator.isTrusted,
-                    action: { _ = CaretLocator.requestTrust() }
+                    symbol: "text.cursor",
+                    title: "Accessibility",
+                    detail: "Opens the panel right at your text cursor and auto-expands snippet triggers. Reads the caret's position only — never your keystrokes or text.",
+                    steps: "Privacy & Security → Accessibility → turn on SafeClip.",
+                    granted: accessibilityGranted,
+                    enable: { _ = CaretLocator.requestTrust() },
+                    settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
                 )
             }
             permissionRow(
-                "rectangle.dashed.badge.record",
-                "Screen Recording",
-                "Only to read pixels for screen-text capture (⌥C) and the color picker. Nothing is recorded or stored.",
-                granted: CGPreflightScreenCaptureAccess(),
-                action: { CGRequestScreenCaptureAccess() }
+                symbol: "rectangle.dashed.badge.record",
+                title: "Screen Recording",
+                detail: "Powers screen-text capture (⌥C) and the magnifier color picker (⌥P). Reads pixels only while you use them — nothing is recorded or stored.",
+                steps: "Privacy & Security → Screen Recording → turn on SafeClip, then reopen it.",
+                granted: screenRecordingGranted,
+                enable: { CGRequestScreenCaptureAccess() },
+                settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
             )
-            Divider()
-            // macOS only shows the system prompt once per permission — if it was
-            // dismissed or denied, tapping Enable again silently does nothing, so
-            // this is the only way back in. Kept visible (not just on denial) so
-            // it's here to refer back to via Settings → About → Show Onboarding Again.
-            Text("If **Enable** doesn't show a prompt, macOS already asked once. Open **System Settings → Privacy & Security**, choose **Accessibility** or **Screen Recording**, and turn the toggle on for SafeClip.")
+            // macOS shows each system prompt only once; if it was already asked
+            // (or dismissed), Enable silently does nothing — Open Settings is the
+            // way back in. Kept for reference via Settings → About → Show Onboarding.
+            Text("Tap **Enable** to let macOS ask. No prompt? It already asked once — tap **Open Settings** and flip SafeClip on.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -205,22 +242,38 @@ struct OnboardingView: View {
     }
 
     private func permissionRow(
-        _ symbol: String, _ title: String, _ detail: String,
-        granted: Bool, action: @escaping () -> Void
+        symbol: String, title: String, detail: String, steps: String,
+        granted: Bool, enable: @escaping () -> Void, settingsURL: String
     ) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: symbol).foregroundStyle(.tint).frame(width: 20)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.callout.weight(.semibold))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            if granted {
-                Label("On", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.iconOnly)
-                    .foregroundStyle(.green)
-            } else {
-                Button("Enable", action: action).controlSize(.small)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(title).font(.callout.weight(.semibold))
+                    if granted {
+                        Label("On", systemImage: "checkmark.circle.fill")
+                            .labelStyle(.iconOnly)
+                            .foregroundStyle(.green)
+                    }
+                    Spacer(minLength: 0)
+                }
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !granted {
+                    HStack(spacing: 8) {
+                        Button("Enable", action: enable).controlSize(.small)
+                        Button("Open Settings") {
+                            if let url = URL(string: settingsURL) { NSWorkspace.shared.open(url) }
+                        }
+                        .controlSize(.small)
+                    }
+                    Text(steps)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

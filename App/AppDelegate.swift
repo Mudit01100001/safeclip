@@ -198,12 +198,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.onReplayOnboarding = { [weak self] in self?.presentOnboarding() }
 
         // 8. Onboarding gate — capture starts only after first-run consent.
-        if UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
+        //    `onboardingVersion` re-presents the wizard once after a material
+        //    change to the flow (e.g. the consolidated permissions step) so
+        //    existing users see it too. A legacy `hasCompletedOnboarding` flag
+        //    (set before versioning) counts as version 1.
+        let defaults = UserDefaults.standard
+        let onboardedVersion = defaults.integer(forKey: "onboardedVersion")
+        let effectiveVersion = onboardedVersion > 0
+            ? onboardedVersion
+            : (defaults.bool(forKey: "hasCompletedOnboarding") ? 1 : 0)
+        if effectiveVersion >= Self.onboardingVersion {
             monitor.start()
         } else {
+            // A true first run waits for consent before capturing; a re-show for
+            // someone who already consented keeps capturing while they revisit it.
+            if effectiveVersion > 0 { monitor.start() }
             presentOnboarding()
         }
         menuBar?.refreshIcon()
+    }
+
+    /// Bumped only when the onboarding flow changes materially (not per app
+    /// release), so existing users are re-shown the wizard once. v2 added the
+    /// consolidated permissions step (Enable + Open Settings for Accessibility
+    /// and Screen Recording).
+    private static let onboardingVersion = 2
+
+    /// The user's previously-recorded consent, used to pre-check the boxes on a
+    /// replay/re-show so they aren't forced to re-accept unchanged terms.
+    private func storedConsent() -> OnboardingResult {
+        let d = UserDefaults.standard
+        return OnboardingResult(
+            acceptedTerms: d.bool(forKey: "hasAcceptedTerms"),
+            acceptedPrivacy: d.bool(forKey: "hasAcceptedPrivacyPolicy"),
+            acceptedMarketing: d.bool(forKey: "hasAcceptedMarketing")
+        )
     }
 
     /// Presents the onboarding wizard (first run and the Settings → About replay).
@@ -211,12 +240,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (DPDP Act 2023 §6 — no bundling consent into one flag).
     private func presentOnboarding() {
         guard let state = appState else { return }
-        let onboarding = OnboardingWindowController(appState: state) { [weak self] result in
+        let onboarding = OnboardingWindowController(
+            appState: state, initialConsent: storedConsent()
+        ) { [weak self] result in
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: "hasCompletedOnboarding")
-            defaults.set(result.acceptedTerms, forKey: "hasAcceptedTerms")
-            defaults.set(result.acceptedPrivacy, forKey: "hasAcceptedPrivacyPolicy")
-            defaults.set(result.acceptedMarketing, forKey: "hasAcceptedMarketing")
+            defaults.set(Self.onboardingVersion, forKey: "onboardedVersion")
+            // Never downgrade prior consent: closing/skipping a version-bump
+            // re-show (which reports all-false) must not erase an earlier
+            // acceptance. First-run skip stays false since there's nothing prior.
+            defaults.set(defaults.bool(forKey: "hasAcceptedTerms") || result.acceptedTerms, forKey: "hasAcceptedTerms")
+            defaults.set(defaults.bool(forKey: "hasAcceptedPrivacyPolicy") || result.acceptedPrivacy, forKey: "hasAcceptedPrivacyPolicy")
+            defaults.set(defaults.bool(forKey: "hasAcceptedMarketing") || result.acceptedMarketing, forKey: "hasAcceptedMarketing")
             defaults.set("1.0", forKey: "termsVersion")
             defaults.set("1.0", forKey: "privacyPolicyVersion")
             defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")

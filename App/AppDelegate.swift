@@ -194,9 +194,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
-        // Replay onboarding on demand (Settings → About). Never a first run —
-        // the user already got here — so dismissing it just closes it.
-        state.onReplayOnboarding = { [weak self] in self?.presentOnboarding(isFirstRun: false) }
+        // Replay onboarding on demand (Settings → About).
+        state.onReplayOnboarding = { [weak self] in self?.presentOnboarding() }
 
         // 8. Install-location gate. Running from the mounted .dmg (or a Gatekeeper
         //    App Translocation path) means permission grants and Sparkle updates
@@ -208,23 +207,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard presentMoveToApplicationsNudge() else { return } // "Quit" terminates
         }
 
-        // 9. Onboarding gate — capture starts only after first-run consent.
-        //    `onboardingVersion` re-presents the wizard once after a material
-        //    change to the flow (e.g. the consolidated permissions step) so
-        //    existing users see it too. A legacy `hasCompletedOnboarding` flag
-        //    (set before versioning) counts as version 1.
+        // 9. Onboarding + capture gate. Clipboard capture NEVER begins until the
+        //    user has accepted both the Terms and the Privacy Policy — skipping or
+        //    closing the wizard records no consent and leaves capture off. The
+        //    wizard re-appears every launch until that consent is given (so there
+        //    is always a path to it), and once more after a material onboarding
+        //    version bump for someone who already consented. A legacy
+        //    `hasCompletedOnboarding` flag (set before versioning) counts as v1.
         let defaults = UserDefaults.standard
+        let hasConsent = defaults.bool(forKey: "hasAcceptedTerms")
+            && defaults.bool(forKey: "hasAcceptedPrivacyPolicy")
         let onboardedVersion = defaults.integer(forKey: "onboardedVersion")
         let effectiveVersion = onboardedVersion > 0
             ? onboardedVersion
             : (defaults.bool(forKey: "hasCompletedOnboarding") ? 1 : 0)
-        if effectiveVersion >= Self.onboardingVersion {
+        if hasConsent {
             monitor.start()
-        } else {
-            // A true first run waits for consent before capturing; a re-show for
-            // someone who already consented keeps capturing while they revisit it.
-            if effectiveVersion > 0 { monitor.start() }
-            presentOnboarding(isFirstRun: effectiveVersion == 0)
+        }
+        if !hasConsent || effectiveVersion < Self.onboardingVersion {
+            presentOnboarding()
         }
         menuBar?.refreshIcon()
     }
@@ -282,44 +283,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    /// Presents the onboarding wizard (first run and the Settings → About replay).
-    /// Terms, Privacy Policy, and marketing consent are each recorded separately
-    /// (DPDP Act 2023 §6 — no bundling consent into one flag).
+    /// Presents the onboarding wizard (first run, the every-launch re-prompt until
+    /// consent, a version-bump re-show, and the Settings → About replay). Terms,
+    /// Privacy Policy, and marketing consent are each recorded separately (DPDP Act
+    /// 2023 §6 — no bundling consent into one flag).
     ///
-    /// `isFirstRun` is true only when nothing has ever been onboarded. On a first
-    /// run, closing the window *without* an explicit Start/Skip (e.g. quitting to
-    /// move the app out of the DMG) is treated as "not done yet" — the gate stays
-    /// unset so onboarding re-appears next launch, and capture never begins
-    /// without consent. Any explicit finish, or dismissing a version-bump re-show
-    /// (where the user already consented before), still marks the flow seen so a
-    /// returning user is never nagged.
-    private func presentOnboarding(isFirstRun: Bool) {
+    /// Capture begins only once Terms + Privacy are both accepted here — a Skip or
+    /// a bare close records no consent and leaves capture off (the launch gate
+    /// re-shows this wizard until consent exists). Consent is OR-merged so closing
+    /// or skipping a re-show can never downgrade an earlier acceptance.
+    private func presentOnboarding() {
         guard let state = appState else { return }
         let onboarding = OnboardingWindowController(
             appState: state, initialConsent: storedConsent()
-        ) { [weak self] result, completed in
+        ) { [weak self] result in
             guard let self else { return }
             self.onboardingController = nil
 
-            // First-run bare-close (no Start/Skip) → leave everything unset so the
-            // wizard shows again and nothing is captured until the user consents.
-            guard completed || !isFirstRun else { return }
-
             let defaults = UserDefaults.standard
+            let terms = defaults.bool(forKey: "hasAcceptedTerms") || result.acceptedTerms
+            let privacy = defaults.bool(forKey: "hasAcceptedPrivacyPolicy") || result.acceptedPrivacy
+            defaults.set(terms, forKey: "hasAcceptedTerms")
+            defaults.set(privacy, forKey: "hasAcceptedPrivacyPolicy")
+            defaults.set(defaults.bool(forKey: "hasAcceptedMarketing") || result.acceptedMarketing, forKey: "hasAcceptedMarketing")
             defaults.set(true, forKey: "hasCompletedOnboarding")
             defaults.set(Self.onboardingVersion, forKey: "onboardedVersion")
-            // Never downgrade prior consent: closing/skipping a version-bump
-            // re-show (which reports all-false) must not erase an earlier
-            // acceptance. First-run skip stays false since there's nothing prior.
-            defaults.set(defaults.bool(forKey: "hasAcceptedTerms") || result.acceptedTerms, forKey: "hasAcceptedTerms")
-            defaults.set(defaults.bool(forKey: "hasAcceptedPrivacyPolicy") || result.acceptedPrivacy, forKey: "hasAcceptedPrivacyPolicy")
-            defaults.set(defaults.bool(forKey: "hasAcceptedMarketing") || result.acceptedMarketing, forKey: "hasAcceptedMarketing")
             defaults.set("1.0", forKey: "termsVersion")
             defaults.set("1.0", forKey: "privacyPolicyVersion")
             defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")
-            self.monitor?.start() // no-op if already running
-            if let settings = self.appState?.settings {
-                self.syncLoginItem(settings.launchAtLogin)
+
+            // Only now that consent is in place does capture begin. Skipping or
+            // closing without accepting leaves `terms`/`privacy` false, so this
+            // stays off and the launch gate will re-present the wizard.
+            if terms && privacy {
+                self.monitor?.start() // no-op if already running
+                if let settings = self.appState?.settings {
+                    self.syncLoginItem(settings.launchAtLogin)
+                }
             }
         }
         onboardingController = onboarding

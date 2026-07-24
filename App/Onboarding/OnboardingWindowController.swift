@@ -1,14 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// First-launch onboarding (PRD §7). Explicitly finishing (Start/Skip) is
-/// distinct from simply closing the window: the `completed` flag lets the
-/// caller re-show onboarding next launch if the user dismissed it without
-/// finishing (e.g. closed it to move the app out of the DMG). TERMS §9 still
-/// makes continued use acceptance.
+/// First-launch onboarding (PRD §7). Skipping or closing the window records no
+/// consent, so clipboard capture stays off and the wizard re-appears next launch
+/// until the user accepts (AppDelegate gates capture on that consent). TERMS §9
+/// still makes continued use acceptance of the Terms.
 @MainActor
 final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
-    private var completion: ((_ result: OnboardingResult, _ completed: Bool) -> Void)?
+    private var completion: ((_ result: OnboardingResult) -> Void)?
     private var finished = false
 
     convenience init(
@@ -16,7 +15,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         initialConsent: OnboardingResult = OnboardingResult(
             acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false
         ),
-        completion: @escaping (_ result: OnboardingResult, _ completed: Bool) -> Void
+        completion: @escaping (_ result: OnboardingResult) -> Void
     ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
@@ -37,8 +36,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         window.delegate = self
         window.contentView = NSHostingView(
             rootView: OnboardingView(appState: appState, initialConsent: initialConsent) { [weak self] result in
-                // Reaching Start or Skip is an explicit finish.
-                self?.finish(result: result, completed: true)
+                self?.finish(result: result)
             }
         )
     }
@@ -49,19 +47,16 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func finish(result: OnboardingResult, completed: Bool) {
+    private func finish(result: OnboardingResult) {
         guard !finished else { return }
         finished = true
-        completion?(result, completed)
+        completion?(result)
         window?.close()
     }
 
     func windowWillClose(_ notification: Notification) {
-        // Bare close (red button / ⌘W) — not an explicit finish, so `completed`
-        // is false. The `finished` guard means this no-ops after Start/Skip.
-        finish(
-            result: OnboardingResult(acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false),
-            completed: false
-        )
+        // A bare close (red button / ⌘W) reports no consent, same as Skip. The
+        // `finished` guard means this no-ops after an explicit Start/Skip.
+        finish(result: OnboardingResult(acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false))
     }
 }

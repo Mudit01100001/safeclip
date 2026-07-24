@@ -1,11 +1,14 @@
 import AppKit
 import SwiftUI
 
-/// First-launch onboarding (PRD §7). Closing the window counts as skipping —
-/// the app still works; TERMS §9 makes continued use acceptance.
+/// First-launch onboarding (PRD §7). Explicitly finishing (Start/Skip) is
+/// distinct from simply closing the window: the `completed` flag lets the
+/// caller re-show onboarding next launch if the user dismissed it without
+/// finishing (e.g. closed it to move the app out of the DMG). TERMS §9 still
+/// makes continued use acceptance.
 @MainActor
 final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
-    private var completion: ((_ result: OnboardingResult) -> Void)?
+    private var completion: ((_ result: OnboardingResult, _ completed: Bool) -> Void)?
     private var finished = false
 
     convenience init(
@@ -13,7 +16,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         initialConsent: OnboardingResult = OnboardingResult(
             acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false
         ),
-        completion: @escaping (_ result: OnboardingResult) -> Void
+        completion: @escaping (_ result: OnboardingResult, _ completed: Bool) -> Void
     ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
@@ -34,7 +37,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         window.delegate = self
         window.contentView = NSHostingView(
             rootView: OnboardingView(appState: appState, initialConsent: initialConsent) { [weak self] result in
-                self?.finish(result: result)
+                // Reaching Start or Skip is an explicit finish.
+                self?.finish(result: result, completed: true)
             }
         )
     }
@@ -45,14 +49,19 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func finish(result: OnboardingResult) {
+    private func finish(result: OnboardingResult, completed: Bool) {
         guard !finished else { return }
         finished = true
-        completion?(result)
+        completion?(result, completed)
         window?.close()
     }
 
     func windowWillClose(_ notification: Notification) {
-        finish(result: OnboardingResult(acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false))
+        // Bare close (red button / ⌘W) — not an explicit finish, so `completed`
+        // is false. The `finished` guard means this no-ops after Start/Skip.
+        finish(
+            result: OnboardingResult(acceptedTerms: false, acceptedPrivacy: false, acceptedMarketing: false),
+            completed: false
+        )
     }
 }

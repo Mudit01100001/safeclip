@@ -194,10 +194,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
 
-        // Replay onboarding on demand (Settings → About).
-        state.onReplayOnboarding = { [weak self] in self?.presentOnboarding() }
+        // Replay onboarding on demand (Settings → About). Never a first run —
+        // the user already got here — so dismissing it just closes it.
+        state.onReplayOnboarding = { [weak self] in self?.presentOnboarding(isFirstRun: false) }
 
-        // 8. Onboarding gate — capture starts only after first-run consent.
+        // 8. Install-location gate. Running from the mounted .dmg (or a Gatekeeper
+        //    App Translocation path) means permission grants and Sparkle updates
+        //    are pinned to a randomized, read-only path and get discarded once the
+        //    app is moved — so setting anything up here is wasted. Ask the user to
+        //    move it to Applications first, and don't onboard or capture until they
+        //    relaunch from a real install location.
+        if Self.isRunningFromDiskImageOrTranslocated() {
+            guard presentMoveToApplicationsNudge() else { return } // "Quit" terminates
+        }
+
+        // 9. Onboarding gate — capture starts only after first-run consent.
         //    `onboardingVersion` re-presents the wizard once after a material
         //    change to the flow (e.g. the consolidated permissions step) so
         //    existing users see it too. A legacy `hasCompletedOnboarding` flag
@@ -213,9 +224,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // A true first run waits for consent before capturing; a re-show for
             // someone who already consented keeps capturing while they revisit it.
             if effectiveVersion > 0 { monitor.start() }
-            presentOnboarding()
+            presentOnboarding(isFirstRun: effectiveVersion == 0)
         }
         menuBar?.refreshIcon()
+    }
+
+    /// True when the app is running from a mounted disk image or a Gatekeeper
+    /// App Translocation path rather than a real install location. Mounted `.dmg`
+    /// volumes live under `/Volumes`; translocated copies live under a randomized
+    /// `…/AppTranslocation/…` path. Dev builds run from DerivedData under the home
+    /// directory, so this never fires while developing.
+    private static func isRunningFromDiskImageOrTranslocated() -> Bool {
+        let path = Bundle.main.bundlePath
+        return path.hasPrefix("/Volumes/") || path.contains("/AppTranslocation/")
+    }
+
+    /// Asks the user to move the app to Applications before continuing. Returns
+    /// `true` if they chose to continue anyway (an escape hatch for the rare
+    /// legit case of an app installed on an external volume); returns `false`
+    /// after terminating when they choose Quit.
+    private func presentMoveToApplicationsNudge() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Move SafeClip to your Applications folder"
+        alert.informativeText = """
+        You're running SafeClip from its installer disk image. For its \
+        permissions (Screen Recording, Accessibility) and automatic updates to \
+        work, it needs to live in your Applications folder.
+
+        Drag SafeClip onto the Applications folder in the installer window, then \
+        open it from there. SafeClip will quit so you can do this.
+        """
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Continue Anyway")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSApp.terminate(nil)
+            return false
+        }
+        return true
     }
 
     /// Bumped only when the onboarding flow changes materially (not per app
@@ -238,11 +285,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Presents the onboarding wizard (first run and the Settings → About replay).
     /// Terms, Privacy Policy, and marketing consent are each recorded separately
     /// (DPDP Act 2023 §6 — no bundling consent into one flag).
-    private func presentOnboarding() {
+    ///
+    /// `isFirstRun` is true only when nothing has ever been onboarded. On a first
+    /// run, closing the window *without* an explicit Start/Skip (e.g. quitting to
+    /// move the app out of the DMG) is treated as "not done yet" — the gate stays
+    /// unset so onboarding re-appears next launch, and capture never begins
+    /// without consent. Any explicit finish, or dismissing a version-bump re-show
+    /// (where the user already consented before), still marks the flow seen so a
+    /// returning user is never nagged.
+    private func presentOnboarding(isFirstRun: Bool) {
         guard let state = appState else { return }
         let onboarding = OnboardingWindowController(
             appState: state, initialConsent: storedConsent()
-        ) { [weak self] result in
+        ) { [weak self] result, completed in
+            guard let self else { return }
+            self.onboardingController = nil
+
+            // First-run bare-close (no Start/Skip) → leave everything unset so the
+            // wizard shows again and nothing is captured until the user consents.
+            guard completed || !isFirstRun else { return }
+
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: "hasCompletedOnboarding")
             defaults.set(Self.onboardingVersion, forKey: "onboardedVersion")
@@ -255,10 +317,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defaults.set("1.0", forKey: "termsVersion")
             defaults.set("1.0", forKey: "privacyPolicyVersion")
             defaults.set(Date().timeIntervalSince1970, forKey: "termsRespondedAt")
-            self?.onboardingController = nil
-            self?.monitor?.start() // no-op if already running
-            if let settings = self?.appState?.settings {
-                self?.syncLoginItem(settings.launchAtLogin)
+            self.monitor?.start() // no-op if already running
+            if let settings = self.appState?.settings {
+                self.syncLoginItem(settings.launchAtLogin)
             }
         }
         onboardingController = onboarding

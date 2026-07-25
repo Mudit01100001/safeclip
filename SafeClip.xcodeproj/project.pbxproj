@@ -31,6 +31,7 @@
 		46795EAE46E87866CAC11109 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFFC11E2FB44609C52CA450C /* PrivacySettingsView.swift */; };
 		4A7EE5ABB080A1905DA89F47 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0219177FA0CE615C8F89C6E /* SyncService.swift */; };
 		4D58645374C5556A42FB4BC5 /* SnippetsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A47DE33DC5AADDCBB0608F /* SnippetsSettingsView.swift */; };
+		50132032C323890AF9B7E85D /* DeveloperFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC019531C1A1CAEF80E1B782 /* DeveloperFlags.swift */; };
 		51C6BA37AC5E511D46E837EB /* PRIVACY.md in Resources */ = {isa = PBXBuildFile; fileRef = 1651F92D57C4C1DD92466058 /* PRIVACY.md */; };
 		539713335B3CFA303873740E /* FloatingPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34073832F3745835BCD23A80 /* FloatingPanelController.swift */; };
 		53F148BAF100235EF58C646B /* CaretLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B506B4AC266055C40BF70A73 /* CaretLocator.swift */; };
@@ -49,6 +50,7 @@
 		79D8C2D887643AE92FC10041 /* PanelChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C19F282F156093A301A88DC5 /* PanelChrome.swift */; };
 		800BF18583CEA616C4D017E5 /* OCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAEAC84A23E7E984BF8CE2D3 /* OCRService.swift */; };
 		803BE6AE402125FF1746912B /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9A523F0099E8C1D92A5488 /* SyncSettingsView.swift */; };
+		88E4EDCE0E0707C5667ABEF9 /* DeveloperFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC019531C1A1CAEF80E1B782 /* DeveloperFlags.swift */; };
 		8B1B388E951CEB0DF40D6621 /* UpdateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591D844942C9F8658D075013 /* UpdateService.swift */; };
 		8D68AE409FA6C8F6D7225B87 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62B7BE197BAA4E64B7965F9 /* AboutView.swift */; };
 		9235BAC4BC1774F777ACE73F /* OnboardingVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81AFACB822B07DE4C39B442D /* OnboardingVideoPlayer.swift */; };
@@ -135,6 +137,7 @@
 		CF9A523F0099E8C1D92A5488 /* SyncSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSettingsView.swift; sourceTree = "<group>"; };
 		D62B7BE197BAA4E64B7965F9 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		D68218ECD8726249F3E65793 /* SnippetExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetExpander.swift; sourceTree = "<group>"; };
+		DC019531C1A1CAEF80E1B782 /* DeveloperFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperFlags.swift; sourceTree = "<group>"; };
 		E86EC001E4BF79EEA7F13AC5 /* UpdatesSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdatesSettingsView.swift; sourceTree = "<group>"; };
 		EC4B9AF6278F8DE2023A8FB0 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		EFFC11E2FB44609C52CA450C /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
@@ -212,6 +215,7 @@
 				3A2C4787E518FD5034E79291 /* AppDelegate.swift */,
 				C568ADBC94E2D2E16C614B09 /* AppState.swift */,
 				98331C63C481C3F50890CA41 /* Assets.xcassets */,
+				DC019531C1A1CAEF80E1B782 /* DeveloperFlags.swift */,
 				EC4B9AF6278F8DE2023A8FB0 /* main.swift */,
 				0E4FEC8304AF5BC53C53AC1C /* Shortcuts.swift */,
 				CE06C52EE1DA595BEF56C5CE /* MenuBar */,
@@ -417,6 +421,7 @@
 				3B4D880EA54EAC3497C7D74E /* ClipboardMonitor.swift in Sources */,
 				06225DF0F5808E02E17B9A60 /* ClipboardPanelView.swift in Sources */,
 				D5D936BB23AC864D2C24F907 /* ColorLoupe.swift in Sources */,
+				50132032C323890AF9B7E85D /* DeveloperFlags.swift in Sources */,
 				C4454877E79532CA21DC1773 /* Feedback.swift in Sources */,
 				457046E1A558960806F8C69C /* FloatingPanelController.swift in Sources */,
 				12EDD11B60047B54D7B48DAC /* GeneralSettingsView.swift in Sources */,
@@ -461,6 +466,7 @@
 				69EEFA1D4AB9F7DF865EDCD9 /* ClipboardMonitor.swift in Sources */,
 				1C3E440A12D05B69CAB419B4 /* ClipboardPanelView.swift in Sources */,
 				0CCF405098FDCF68969C4088 /* ColorLoupe.swift in Sources */,
+				88E4EDCE0E0707C5667ABEF9 /* DeveloperFlags.swift in Sources */,
 				65332F8B5739AC8F2D1388D0 /* Feedback.swift in Sources */,
 				539713335B3CFA303873740E /* FloatingPanelController.swift in Sources */,
 				F7A77084F606ED7F06E2F439 /* GeneralSettingsView.swift in Sources */,

@@ -1,34 +1,24 @@
 import AppKit
 
 /// Screen-capture protection for the windows that show clipboard history, a
-/// just-copied value, or the color-picker loupe. Normally these are excluded
-/// from screen capture (`.none`) so they can never leak into someone else's
-/// screenshot or recording — one of SafeClip's core privacy promises (they're
-/// invisible in QuickTime, ⌘⇧5, Zoom/Meet screen-share, etc.).
+/// just-copied value, or the color-picker loupe. These are excluded from screen
+/// capture (`.none`) so they can never leak into someone else's screenshot or
+/// recording — one of SafeClip's core privacy promises (they're invisible in
+/// QuickTime, ⌘⇧5, Zoom/Meet screen-share, etc.).
 ///
-/// That same exclusion means the OWNER can't record the app for marketing
-/// previews either. This is the single, owner-only lever to lift it — nobody
-/// else can, and it's off by default:
-///
-///   • **Debug build (Xcode ⌘R): always recordable.** Debug builds are never
-///     distributed, so this can't affect any shipped install.
-///   • **Release build: only if a hidden default is set,** then relaunch:
-///       `defaults write com.mudit.safeclip allowScreenRecording -bool YES`
-///     There is no UI for it and the app is closed-source, so it's
-///     undiscoverable; and even if someone flipped it, it would only un-protect
-///     *their own* windows on *their own* machine, never anyone else's.
-///
-/// Turn the release lever back off with:
-///   `defaults write com.mudit.safeclip allowScreenRecording -bool NO`
+/// **Release builds are always protected** — there is no runtime lever to lift
+/// it, so the shipped app can never be recorded. The same exclusion also stops
+/// the owner from recording the app for marketing previews, so a Debug build can
+/// lift it via the local `DeveloperFlags.allowScreenRecording` toggle (developer
+/// option, never committed on, ignored by release). See DeveloperFlags.swift.
 enum CaptureProtection {
-    static let recordingDefaultsKey = "allowScreenRecording"
-
-    /// Whether capture-sensitive windows may be recorded on this machine.
+    /// Whether capture-sensitive windows may be recorded. Debug builds honor the
+    /// local developer toggle; release builds never allow it.
     static var recordingAllowed: Bool {
         #if DEBUG
-        return true
+        return DeveloperFlags.allowScreenRecording
         #else
-        return UserDefaults.standard.bool(forKey: recordingDefaultsKey)
+        return false
         #endif
     }
 

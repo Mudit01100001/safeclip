@@ -241,7 +241,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.sharingType = .none // keep toast contents (e.g. a copied value) out of captures
+        panel.sharingType = CaptureProtection.sharingType // keep toast contents out of others' captures (owner can record — see CaptureProtection)
         panel.hidesOnDeactivate = false
         panel.contentViewController = host
         panel.setContentSize(host.view.fittingSize)

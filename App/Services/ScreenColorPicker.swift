@@ -76,7 +76,7 @@ final class ScreenColorPicker {
         overlay.ignoresMouseEvents = false
         overlay.acceptsMouseMovedEvents = true
         overlay.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        overlay.sharingType = .none
+        overlay.sharingType = CaptureProtection.sharingType
         overlay.makeKeyAndOrderFront(nil)
         self.overlay = overlay
 
@@ -111,7 +111,7 @@ final class ScreenColorPicker {
         window.hasShadow = false
         window.ignoresMouseEvents = true // clicks pass through to the overlay
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
-        window.sharingType = .none
+        window.sharingType = CaptureProtection.sharingType
         window.contentView = NSHostingView(
             rootView: ColorLoupeView(model: loupeModel, side: Self.loupeSide)
         )

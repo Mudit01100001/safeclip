@@ -152,14 +152,10 @@ final class FloatingPanelController: NSObject, NSWindowDelegate {
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .utilityWindow
         // Excluded from screen capture (screenshots AND recordings) — clipboard
-        // history should never end up in someone else's capture. In DEBUG it's
-        // made capturable TEMPORARILY so the panel can be screenshotted while
-        // diagnosing scroll; release builds are always `.none`.
-        #if DEBUG
-        panel.sharingType = .readOnly
-        #else
-        panel.sharingType = .none
-        #endif
+        // history should never end up in someone else's capture. The owner can
+        // lift this to record previews (Debug build, or a hidden default on
+        // release); see CaptureProtection.
+        panel.sharingType = CaptureProtection.sharingType
         panel.delegate = self
 
         hostingView.autoresizingMask = [.width, .height]

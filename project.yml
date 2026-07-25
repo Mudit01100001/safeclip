@@ -66,8 +66,6 @@ targets:
         product: Sparkle
     scheme:
       testTargets: []
-      environmentVariables:
-        SAFECLIP_SCROLL_TEST: "1"
 
   # Mac App Store channel (Session 4): identical sources, App Sandbox on.
   # Same bundle ID — it's the same app, one channel installed at a time.

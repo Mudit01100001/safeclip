@@ -1,8 +1,14 @@
 #!/usr/bin/swift
-// Renders the SafeClip .dmg background image used by Scripts/release.sh when it
-// lays out the installer window (the "drag SafeClip → Applications" canvas).
-// Output is deterministic and committed to the repo (Scripts/assets/), so it's
-// reviewable and the release script never depends on a design tool.
+// Renders a SafeClip .dmg background image for Scripts/release.sh's installer
+// window (the "drag SafeClip → Applications" canvas).
+//
+// ⚠️ HEADS UP: the committed Scripts/assets/dmg-background@2x.png is now the
+// OWNER'S HAND-MADE artwork (a solid arrow + glow, with the "SafeClip" wordmark
+// composited on in the system font). Running this script OVERWRITES it with the
+// schematic squiggle-arrow version — only do that if you deliberately want to
+// replace the hand-made art. This file is kept accurate mainly as the geometry
+// source of truth (W/H + icon centres) that MUST stay in lockstep with
+// release.sh's window bounds; the output is otherwise a fallback/reference.
 //
 // It draws the dark canvas, the "SafeClip" wordmark, and a hand-drawn squiggly
 // arrow pointing from where Finder places the app icon toward the Applications
@@ -15,10 +21,11 @@
 import AppKit
 
 // ── Geometry (points). Keep in lockstep with release.sh's window bounds. ──────
-let W = 640, H = 400
+// 640×480 pt content = a 4:3 window; rendered @2x ⇒ a 1280×960 px background.
+let W = 640, H = 480
 let scale = 2 // @2x for retina Finder windows
-let iconCenterY = 200.0 // matches the AppleScript icon Y (top-left origin ⇒ same middle)
-let appIconX = 160.0
+let iconCenterY = 240.0 // vertical centre of the 4:3 content (matches AppleScript icon Y)
+let appIconX = 160.0 // symmetric about the 320 centre ⇒ the icon pair is centred
 let appsIconX = 480.0
 
 let outPath = CommandLine.arguments.count > 1

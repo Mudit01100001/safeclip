@@ -51,7 +51,7 @@ Every mainstream macOS clipboard manager stores your history as plaintext on dis
 
 ## Install
 
-**Buy:** the notarized `.dmg` is a paid download from the SafeClip website (coming soon). On first capture, macOS may show a one-time clipboard-access prompt — choose *Always Allow*. The first ⌥C OCR shows a one-time Screen Recording consent — allow it once, then quit & reopen.
+**Buy:** the notarized `.dmg` is a paid download from the SafeClip website. On first capture, macOS may show a one-time clipboard-access prompt — choose *Always Allow*. The first ⌥C OCR shows a one-time Screen Recording consent — allow it once, then quit & reopen.
 
 **Build from source** (the high-trust path — free, MIT):
 

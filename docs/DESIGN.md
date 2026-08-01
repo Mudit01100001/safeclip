@@ -2,6 +2,8 @@
 
 _Last updated: 15 June 2026 (Session 5). Reflects the built app, incl. screen-region OCR (⌥C) and the ⌥V/⌥C shortcut remap._
 
+> ⚠️ **Architectural background, not live status.** The mental model and lifecycle described below are still broadly accurate, but a great deal has shipped since Session 5 (sync, snippets, auto-update, the whole beta cycle, the app going public/MIT). For current state, see [../CLAUDE.md](../CLAUDE.md).
+
 ---
 
 ## Table of Contents

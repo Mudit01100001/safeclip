@@ -2,6 +2,8 @@
 
 _Last updated: 16 June 2026 (Session 6 — opt-in caret-anchored panel). Distribution decided: paid notarized .dmg sold on Mudit's own website (payment gateway); MIT source public for build/audit; Mac App Store deferred until website revenue funds the Apple Developer license._
 
+> ⚠️ **This document stopped being updated after Session 6 (16 June 2026).** Everything since — milestones M3–M5, v0.2.0, OCR, sync, snippets, auto-update, the whole beta release cycle, the app going public/MIT again — lives session-by-session in [../CLAUDE.md](../CLAUDE.md), which is the actual current source of truth. Treat the content below as historical/architectural background, not live status.
+
 ---
 
 ## Table of Contents
